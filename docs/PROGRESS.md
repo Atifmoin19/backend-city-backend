@@ -23,6 +23,11 @@ Running log. Newest entry on top. Update at the end of every task.
 - Docker image builds pinned sandbox venv (Pyodide parity). 45 tests pass in the Linux container.
 - Docs: README, CLAUDE.md, ARCHITECTURE, API, DATABASE.
 
+- Phase 0 spike 2 verified end to end in Chrome with the frontend: practice in Pyodide, checkpoint
+  graded here (100%, 12/12 hidden). Found and fixed: the policy check now dedents snippets
+  (the editor sends class-body indentation).
+- `scripts/dev.sh`: Postgres in Docker + uvicorn `--reload` on the host (port check included).
+
 ### Pending
 - Persist attempts + topic_progress on grade; hint usage → score penalty.
 - Content from DB (`game_versions`) instead of `content/seed` JSON; admin CRUD.

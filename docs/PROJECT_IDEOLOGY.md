@@ -446,7 +446,7 @@ Later: analytics, feedback inbox, announcements, audit log, usage monitor.
   - Fake email/webhook endpoints
   - Query counter (for N+1 games)
   - Clock control (for TTL/expiry games)
-- **[DECIDED — Phase 0 spike, 2026-09-25]:** real FastAPI + Pydantic v2 run in Pyodide 314.0.7. Measured: core boot ~1.4 s, FastAPI stack load ~0.5 s + import ~0.9 s, in-process request ~0.13 ms; extra download ~2.2 MB gzipped on top of ~6 MB Pyodide core (cached after first visit). No mini-framework needed. Pyodide bundles fastapi 0.136.1 / pydantic 2.12.5, so the server sandbox is pinned to the same versions.
+- **[DECIDED — Phase 0 spike, 2026-09-25]:** real FastAPI + Pydantic v2 run in Pyodide 314.0.7. Measured: core boot ~1.4 s, FastAPI stack load ~0.5 s + import ~0.9 s, in-process request ~0.13 ms; extra download ~2.2 MB gzipped on top of ~6 MB Pyodide core (cached after first visit). No mini-framework needed. Pyodide bundles fastapi 0.136.1 / pydantic 2.12.5, so the server sandbox is pinned to the same versions. Browser spike 2 (Chrome, Bouncer game end to end): cold boot 4.8–6.9 s from navigation to Python ready, ~40 ms per practice run. Pyodide 314 only runs in **module** workers, and Turbopack bundles workers as classic ones, so the worker is served as a static module from `public/workers/`.
 
 ### 11.3 Grading
 - **Grade by behavior, not string matching** — many correct answers exist.
@@ -789,11 +789,11 @@ venv built from it, so grading behaves exactly like the browser.
 ## 21. Roadmap
 
 ### Phase 0 — Technical spikes (1–2 weeks)
-- Pyodide + FastAPI/Pydantic feasibility and load time.
-- Request Flow Visualizer prototype (PixiJS) with one Bouncer game.
+- Pyodide + FastAPI/Pydantic feasibility and load time. **Done 2026-09-25: viable.**
+- Request Flow Visualizer prototype (PixiJS) with one Bouncer game. **Done 2026-09-25.**
 - PGlite query game prototype.
-- Server sandbox prototype on Render free tier.
-- Decide harness approach (real FastAPI vs mini framework).
+- Server sandbox prototype on Render free tier. **Prototype done locally in Docker; Render deploy pending.**
+- Decide harness approach (real FastAPI vs mini framework). **Decided: real FastAPI.**
 
 ### Phase 1 — MVP
 - Auth (signup, login, verify email, reset password).
