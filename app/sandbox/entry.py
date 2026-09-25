@@ -7,6 +7,7 @@ Must NOT import anything from `app` (keeps secrets/config out of the child proce
 import asyncio
 import io
 import json
+import signal
 import sys
 from typing import Any
 
@@ -44,6 +45,14 @@ def _audit(event: str, args: tuple[Any, ...]) -> None:
             raise PermissionError("Blocked by sandbox: file write")
 
 
+class _CodeTimeout(BaseException):
+    """BaseException so learner code's `except Exception` can't swallow the timer."""
+
+
+def _on_alarm(_signum: int, _frame: object) -> None:
+    raise _CodeTimeout
+
+
 def main() -> None:
     sys.path.insert(0, sys.argv[1])
     payload = json.loads(sys.stdin.read())
@@ -58,10 +67,18 @@ def main() -> None:
     loop = asyncio.new_event_loop()
     real_stdout = sys.stdout
     sys.stdout = io.StringIO()  # learner print() output is captured, never mixed with result
+    # The learner's time budget starts now, after the (slow) imports; the parent keeps a
+    # hard wall-clock kill as a backstop in case this timer is swallowed.
+    signal.signal(signal.SIGALRM, _on_alarm)
     sys.addaudithook(_audit)  # irreversible for the life of this process
+    signal.setitimer(signal.ITIMER_REAL, float(payload.get("timeout", 4)))
     try:
         report = loop.run_until_complete(run(payload["source"], payload["tests"]))
+    except _CodeTimeout:
+        sys.stdout = real_stdout
+        sys.exit(124)
     finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
         sys.stdout = real_stdout
     real_stdout.write(json.dumps(report, default=str))
     real_stdout.flush()

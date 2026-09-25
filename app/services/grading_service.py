@@ -53,7 +53,11 @@ async def grade(slug: str, attempt_token: str, snippet: str) -> GradeResponse:
     result = await execute(
         source,
         public + hidden,
-        SandboxLimits(settings.sandbox_timeout_seconds, settings.sandbox_memory_limit_mb),
+        SandboxLimits(
+            settings.sandbox_timeout_seconds,
+            settings.sandbox_memory_limit_mb,
+            settings.sandbox_startup_seconds,
+        ),
     )
     base = {"score": 0, "passed": False, "stars": 0, "pass_threshold": threshold}
     if result.timed_out:

@@ -43,6 +43,24 @@ async def test_sandbox_times_out_infinite_loop() -> None:
     assert result.timed_out
 
 
+async def test_code_timer_cannot_be_swallowed_by_except_exception() -> None:
+    src = (
+        "while True:\n    try:\n        while True:\n            pass\n"
+        "    except Exception:\n        pass\n"
+    )
+    result = await execute(src, [], SandboxLimits(1.0, 256))
+    assert result.timed_out
+
+
+async def test_wall_clock_backstop_kills_code_that_swallows_the_timer() -> None:
+    src = (
+        "while True:\n    try:\n        while True:\n            pass\n"
+        "    except BaseException:\n        pass\n"
+    )
+    result = await execute(src, [], SandboxLimits(1.0, 256, startup_seconds=3.0))
+    assert result.timed_out
+
+
 async def test_sandbox_blocks_network() -> None:
     src = "import socket\nsocket.create_connection(('example.com', 80), timeout=1)\napp = None\n"
     result = await execute(src, [], LIMITS)

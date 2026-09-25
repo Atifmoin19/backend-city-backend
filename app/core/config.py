@@ -70,7 +70,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # Sandbox
-    sandbox_timeout_seconds: float = 4.0
+    sandbox_timeout_seconds: float = 4.0  # learner code only
+    sandbox_startup_seconds: float = 20.0  # interpreter + imports allowance (slow CPUs)
     sandbox_memory_limit_mb: int = 256
     sandbox_max_snippet_chars: int = 4000
     # Interpreter for the grading sandbox (venv built from harness/requirements.txt).

@@ -19,8 +19,18 @@ MAX_OUTPUT_BYTES = 256_000
 
 @dataclass(frozen=True)
 class SandboxLimits:
-    timeout_seconds: float
+    timeout_seconds: float  # learner code budget, measured after imports (enforced in-child)
     memory_mb: int
+    # Interpreter start + FastAPI/Pydantic imports. Not charged to the learner: on a small
+    # shared CPU (Render free) this alone can take several seconds.
+    startup_seconds: float = 20.0
+
+    @property
+    def wall_seconds(self) -> float:
+        return self.startup_seconds + self.timeout_seconds
+
+
+TIMEOUT_EXIT = 124  # child exit code when the in-process code timer fires
 
 
 @dataclass(frozen=True)
@@ -34,7 +44,7 @@ class SandboxResult:
 def _apply_rlimits(limits: SandboxLimits) -> None:  # pragma: no cover — runs in child
     import resource
 
-    cpu = int(limits.timeout_seconds) + 1
+    cpu = int(limits.wall_seconds) + 1
     mem = limits.memory_mb * 1024 * 1024
     for res, value in (
         (resource.RLIMIT_CPU, (cpu, cpu)),
@@ -52,7 +62,9 @@ def _python() -> str:
 
 
 async def execute(source: str, tests: list[dict[str, Any]], limits: SandboxLimits) -> SandboxResult:
-    payload = json.dumps({"source": source, "tests": tests}).encode()
+    payload = json.dumps(
+        {"source": source, "tests": tests, "timeout": limits.timeout_seconds}
+    ).encode()
     with tempfile.TemporaryDirectory(prefix="bc-sbx-") as workdir:
         proc = await asyncio.create_subprocess_exec(
             _python(),
@@ -69,13 +81,15 @@ async def execute(source: str, tests: list[dict[str, Any]], limits: SandboxLimit
         )
         try:
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(payload), timeout=limits.timeout_seconds
+                proc.communicate(payload), timeout=limits.wall_seconds
             )
         except TimeoutError:
             proc.kill()
             await proc.wait()
             return SandboxResult(report=None, timed_out=True)
 
+    if proc.returncode == TIMEOUT_EXIT:
+        return SandboxResult(report=None, timed_out=True)
     err = stderr.decode(errors="replace")[-2000:]
     if proc.returncode != 0 or len(stdout) > MAX_OUTPUT_BYTES:
         return SandboxResult(report=None, crashed=True, stderr=err)
