@@ -223,3 +223,14 @@ async def test_super_admin_blocks_and_resets(client: AsyncClient, db: AsyncSessi
     me = await client.post(f"/admin/users/{boss['id']}/block", json={"blocked": True})
     assert me.status_code == 403
     assert me.json()["error"]["code"] == "self_action"
+
+
+async def test_admin_sees_interest_per_track(client: AsyncClient, db: AsyncSession) -> None:
+    await register(client, "fan@example.com")
+    await client.post("/me/interests", json={"track": "frontend"})
+    await admin(client, db)
+    tracks = (await client.get("/admin/content")).json()["tracks"]
+    by_slug = {t["slug"]: t for t in tracks}
+    assert by_slug["frontend"]["interested"] == 1
+    assert by_slug["full-stack"]["interested"] == 0
+    assert by_slug["python-backend"]["status"] == "published"

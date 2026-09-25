@@ -39,7 +39,15 @@ class AdminLevel(BaseModel):
     topics: list[AdminTopic]
 
 
+class AdminTrack(BaseModel):
+    slug: str
+    title: str
+    status: ContentStatus
+    interested: int  # learners who asked to be notified
+
+
 class AdminContent(BaseModel):
+    tracks: list[AdminTrack] = []
     levels: list[AdminLevel]
 
 

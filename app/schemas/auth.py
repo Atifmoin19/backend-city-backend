@@ -43,6 +43,7 @@ class UserPublic(BaseModel):
     role: Role
     is_verified: bool
     onboarded_at: datetime | None = Field(default=None, exclude=True)
+    learning_goal: str | None = None  # track slug chosen at signup
 
     @computed_field  # type: ignore[prop-decorator]
     @property

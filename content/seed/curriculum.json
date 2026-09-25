@@ -1,6 +1,7 @@
 {
   "track_slug": "python-backend",
-  "track_title": "Python Backend",
+  "track_title": "Backend District",
+  "track_description": "The engine room: Python, HTTP, routing, validation, then databases, auth and scale. Write real FastAPI code and watch live traffic hit it.",
   "levels": [
     {
       "slug": "academy",
@@ -84,6 +85,18 @@
           ]
         }
       ]
+    }
+  ],
+  "coming_soon": [
+    {
+      "slug": "frontend",
+      "title": "Frontend District",
+      "description": "The city everyone sees: HTML, CSS, JavaScript, components and state."
+    },
+    {
+      "slug": "full-stack",
+      "title": "Full Stack Path",
+      "description": "Both sides wired together: build a feature from the button to the database."
     }
   ]
 }

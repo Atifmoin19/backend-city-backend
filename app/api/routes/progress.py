@@ -1,8 +1,11 @@
 from fastapi import APIRouter, status
 
 from app.core.deps import CurrentUser, SessionDep
+from app.schemas.auth import UserPublic
 from app.schemas.progress import ProgressImport, ProgressPublic, TopicProgressPublic
+from app.schemas.tracks import InterestList, TrackChoice
 from app.services.progress_service import ProgressService
+from app.services.track_service import TrackService
 
 router = APIRouter(prefix="/me", tags=["progress"])
 
@@ -33,3 +36,21 @@ async def import_progress(
 @router.post("/onboarded", status_code=status.HTTP_204_NO_CONTENT)
 async def onboarded(user: CurrentUser, session: SessionDep) -> None:
     await ProgressService(session).mark_onboarded(user)
+
+
+@router.put("/goal", response_model=UserPublic)
+async def choose_goal(body: TrackChoice, user: CurrentUser, session: SessionDep) -> UserPublic:
+    """Which side of the city the learner wants (signup question). A coming-soon choice is
+    also recorded as interest."""
+    return UserPublic.model_validate(await TrackService(session).choose_goal(user, body.track))
+
+
+@router.get("/interests", response_model=InterestList)
+async def interests(user: CurrentUser, session: SessionDep) -> InterestList:
+    return await TrackService(session).interests(user)
+
+
+@router.post("/interests", response_model=InterestList)
+async def notify_me(body: TrackChoice, user: CurrentUser, session: SessionDep) -> InterestList:
+    """ "Notify me" for a track that isn't open yet. Idempotent."""
+    return await TrackService(session).notify_me(user, body.track)

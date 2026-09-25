@@ -3,6 +3,7 @@
 from app.models.attempt import Attempt
 from app.models.chapter import Chapter
 from app.models.game import Game, GameVersion
+from app.models.interest import TrackInterest
 from app.models.level import Level
 from app.models.progress import TopicProgress
 from app.models.tokens import EmailToken, RefreshToken
@@ -21,5 +22,6 @@ __all__ = [
     "Topic",
     "TopicProgress",
     "Track",
+    "TrackInterest",
     "User",
 ]

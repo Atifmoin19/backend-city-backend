@@ -175,3 +175,35 @@ async def test_import_moves_lessons_and_orientation_only(client: AsyncClient) ->
     assert gate["lesson_done"] is True
     assert gate["checkpoint"] is None  # checkpoints only count when graded on the server
     assert gate["complete"] is False
+
+
+async def test_tracks_list_open_and_coming_soon(client: AsyncClient) -> None:
+    tracks = (await client.get("/content/tracks")).json()
+    assert [(t["slug"], t["status"]) for t in tracks] == [
+        ("python-backend", "open"),
+        ("frontend", "coming_soon"),
+        ("full-stack", "coming_soon"),
+    ]
+
+
+async def test_choosing_a_coming_soon_goal_records_interest(client: AsyncClient) -> None:
+    await register(client)
+    res = await client.put("/me/goal", json={"track": "frontend"})
+    assert res.status_code == 200
+    assert res.json()["learning_goal"] == "frontend"
+    assert (await client.get("/auth/me")).json()["learning_goal"] == "frontend"
+    assert (await client.get("/me/interests")).json() == {"tracks": ["frontend"]}
+
+
+async def test_notify_me_is_idempotent(client: AsyncClient) -> None:
+    await register(client)
+    for _ in range(2):
+        res = await client.post("/me/interests", json={"track": "full-stack"})
+    assert res.json() == {"tracks": ["full-stack"]}
+    assert (await client.post("/me/interests", json={"track": "nope"})).status_code == 404
+
+
+async def test_open_goal_is_not_an_interest(client: AsyncClient) -> None:
+    await register(client)
+    await client.put("/me/goal", json={"track": "python-backend"})
+    assert (await client.get("/me/interests")).json() == {"tracks": []}

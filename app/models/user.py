@@ -22,3 +22,5 @@ class User(UUIDPrimaryKey, CreatedAt, Base):
     experience_level: Mapped[str | None] = mapped_column(String(32))
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Track slug the learner chose at signup ("Which side of the city?")
+    learning_goal: Mapped[str | None] = mapped_column(String(80))

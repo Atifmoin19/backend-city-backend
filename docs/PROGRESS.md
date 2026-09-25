@@ -2,6 +2,19 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
+## 2026-09-26 — Session 3: Full Stack City (tracks + interest)
+
+### Done
+- Brand is now **Full Stack City** (plan: docs/FULL_STACK_CITY.md). Tracks are the sides of the
+  city: `python-backend` (open), `frontend` and `full-stack` (seeded as coming soon).
+- `GET /content/tracks`, `PUT /me/goal` (signup question; a coming-soon goal also records
+  interest), `GET/POST /me/interests` (Notify me, idempotent), admin content shows interest
+  per track. Migration `b0de7ed0e716`: `track_interests`, `users.learning_goal`.
+- 156 tests pass.
+
+### Next up
+- Step 3 of the plan: pull-out + Choose your side over the 3D scene; step 4: onboarding question.
+
 ## 2026-09-26 — Session 2: progress API, content depth, ops, admin MVP
 
 ### Done

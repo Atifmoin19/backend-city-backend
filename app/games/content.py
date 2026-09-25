@@ -86,10 +86,20 @@ class SeedLevel(BaseModel):
     chapters: list[SeedChapter]
 
 
+class SeedTrack(BaseModel):
+    """A track ("side of the city") announced before it has content: shown as coming soon."""
+
+    slug: str
+    title: str
+    description: str = ""
+
+
 class Curriculum(BaseModel):
     track_slug: str
     track_title: str
+    track_description: str = ""
     levels: list[SeedLevel]
+    coming_soon: list[SeedTrack] = []
 
 
 @lru_cache

@@ -20,6 +20,7 @@ from app.models.topic import Topic
 from app.models.user import User
 from app.repositories.content_repository import ContentRepository
 from app.repositories.progress_repository import ProgressRepository
+from app.repositories.track_repository import TrackRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.admin import (
     AdminAttempt,
@@ -28,6 +29,7 @@ from app.schemas.admin import (
     AdminGameSummary,
     AdminLevel,
     AdminTopic,
+    AdminTrack,
     AdminUserDetail,
     AdminUserList,
     AdminUserRow,
@@ -83,7 +85,17 @@ class ContentAdminService:
                     ],
                 )
             )
-        return AdminContent(levels=list(levels.values()))
+        tracks = TrackRepository(self.session)
+        counts = await tracks.interest_counts()
+        return AdminContent(
+            tracks=[
+                AdminTrack(
+                    slug=t.slug, title=t.title, status=t.status, interested=counts.get(t.id, 0)
+                )
+                for t in await tracks.all()
+            ],
+            levels=list(levels.values()),
+        )
 
     async def _title(self, game: Game) -> str:
         if game.current_version_id is None:

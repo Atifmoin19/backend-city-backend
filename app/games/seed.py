@@ -39,10 +39,29 @@ async def sync(session: AsyncSession) -> SyncReport:
 
     track = await repo.track_by_slug(cur.track_slug)
     if track is None:
-        track = Track(slug=cur.track_slug, title=cur.track_title, status=PUBLISHED)
+        track = Track(
+            slug=cur.track_slug,
+            title=cur.track_title,
+            description=cur.track_description,
+            status=PUBLISHED,
+            order=1,
+        )
         session.add(track)
         await session.flush()
         report.created.append(f"track:{track.slug}")
+    # Announced tracks: drafts (coming soon) until they get content and an admin opens them
+    for order, upcoming in enumerate(cur.coming_soon, start=2):
+        if await repo.track_by_slug(upcoming.slug) is None:
+            session.add(
+                Track(
+                    slug=upcoming.slug,
+                    title=upcoming.title,
+                    description=upcoming.description,
+                    status=ContentStatus.DRAFT,
+                    order=order,
+                )
+            )
+            report.created.append(f"track:{upcoming.slug}")
 
     for li, lv in enumerate(cur.levels):
         level = await repo.level(track.id, lv.slug)
