@@ -1,0 +1,8 @@
+# Must match the versions bundled with the Pyodide release used by the frontend
+# (pyodide 314.0.7). The grading sandbox runs in a venv built from this file so a snippet
+# behaves identically in the browser and on the server.
+fastapi==0.136.1
+starlette==1.0.0
+pydantic==2.12.5
+pydantic-core==2.41.5
+anyio==4.13.0

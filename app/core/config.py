@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     sandbox_timeout_seconds: float = 4.0
     sandbox_memory_limit_mb: int = 256
     sandbox_max_snippet_chars: int = 4000
+    # Interpreter for the grading sandbox (venv built from harness/requirements.txt).
+    # Empty = current interpreter (fine for local dev/tests).
+    sandbox_python: str = ""
 
     @property
     def is_production(self) -> bool:

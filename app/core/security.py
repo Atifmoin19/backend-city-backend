@@ -65,3 +65,31 @@ def generate_opaque_token() -> str:
 
 def hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+ATTEMPT_TOKEN_TTL = timedelta(hours=2)
+
+
+def create_attempt_token(game_slug: str, seed: int) -> str:
+    """Signed (seed, game) pair so the client cannot pick a favorable variant at submit time."""
+    settings = get_settings()
+    payload = {
+        "type": "attempt",
+        "game": game_slug,
+        "seed": seed,
+        "exp": datetime.now(UTC) + ATTEMPT_TOKEN_TTL,
+    }
+    return jwt.encode(payload, settings.jwt_secret.get_secret_value(), settings.jwt_algorithm)
+
+
+def decode_attempt_token(token: str) -> tuple[str, int] | None:
+    settings = get_settings()
+    try:
+        payload = jwt.decode(
+            token, settings.jwt_secret.get_secret_value(), algorithms=[settings.jwt_algorithm]
+        )
+    except jwt.PyJWTError:
+        return None
+    if payload.get("type") != "attempt":
+        return None
+    return str(payload["game"]), int(payload["seed"])

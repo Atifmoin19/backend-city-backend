@@ -33,6 +33,7 @@ services:
       - ./app:/app/app
       - ./harness:/app/harness
       - ./alembic:/app/alembic
+      - ./content:/app/content
     depends_on:
       db:
         condition: service_healthy
