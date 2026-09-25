@@ -14,6 +14,7 @@ def create_app() -> FastAPI:
         debug=settings.debug,
         docs_url=None if settings.is_production else "/docs",
         redoc_url=None,
+        openapi_url=None if settings.is_production else "/openapi.json",
     )
     app.add_middleware(
         CORSMiddleware,
