@@ -21,6 +21,13 @@ fi
 # Free the port if the Dockerized API from `make up` is holding it
 docker compose stop api >/dev/null 2>&1 || true
 
+if lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "✖ Port ${PORT} is already in use by:"
+  lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN | awk 'NR>1 {print "   pid " $2 "  " $1}' | sort -u
+  echo "  Stop it (kill <pid>) or pick another port: PORT=8010 ./scripts/dev.sh"
+  exit 1
+fi
+
 echo "▶ Starting Postgres (host port 5452)…"
 docker compose up -d db >/dev/null
 until docker compose exec -T db pg_isready -U backend_city >/dev/null 2>&1; do sleep 1; done
