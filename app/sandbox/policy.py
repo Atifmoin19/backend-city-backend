@@ -5,6 +5,7 @@ dangerous builtins are rejected outright. Runtime defenses live in entry.py / ex
 """
 
 import ast
+import textwrap
 from dataclasses import dataclass
 
 ALLOWED_IMPORTS: frozenset[str] = frozenset(
@@ -55,7 +56,8 @@ def check_snippet(snippet: str, *, max_chars: int) -> list[PolicyViolation]:
     if len(snippet) > max_chars:
         return [PolicyViolation(0, f"Snippet too long ({len(snippet)} > {max_chars} characters)")]
     try:
-        tree = ast.parse(snippet)
+        # Editors send the region with its class-body indentation; splice() dedents the same way
+        tree = ast.parse(textwrap.dedent(snippet))
     except SyntaxError as exc:
         return [PolicyViolation(exc.lineno or 0, f"Syntax error: {exc.msg}")]
 

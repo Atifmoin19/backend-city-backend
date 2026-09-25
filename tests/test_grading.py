@@ -25,6 +25,15 @@ async def test_reference_solution_scores_100(seed: int) -> None:
     assert result.hidden_passed == result.hidden_total > 0
 
 
+async def test_indented_snippet_from_editor_is_accepted() -> None:
+    """The editor sends the region with its class-body indentation."""
+    seed = 42
+    indented = "".join(f"    {line}\n" for line in reference_snippet(seed).splitlines())
+    result = await grade(SLUG, create_attempt_token(SLUG, seed), indented)
+    assert result.verdict == "graded"
+    assert result.score == 100
+
+
 async def test_unvalidated_starter_fails() -> None:
     seed = 42
     params = pick_params(get_game(SLUG), seed).params  # type: ignore[arg-type]
