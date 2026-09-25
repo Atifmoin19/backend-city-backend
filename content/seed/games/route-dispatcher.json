@@ -1,0 +1,206 @@
+{
+  "slug": "route-dispatcher",
+  "game_type": "route_dispatcher",
+  "title": "Route Dispatcher",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "Three routes run the {{resource}} desk: one vehicle by number, the special /{{resource}}/{{special}} board, and a search. They're written, but in the wrong order, untyped, and the search ignores its filters.",
+    "goal": "Dispatch every request to the right handler: typed IDs, the fixed path before the parameter path, and a search that reads `line` and `limit`."
+  },
+  "objective": "Every request reaches the handler that was meant for it.",
+  "rules": [
+    "`/{{resource}}/<number>` finds one vehicle; the number is an `int` (anything else bounces with 422).",
+    "`/{{resource}}/{{special}}` always reaches the {{special}} handler, never the number route.",
+    "`/{{resource}}` searches: optional `line`, and `limit` defaulting to {{default_limit}}."
+  ],
+  "variant_params": {
+    "resource": [
+      "trains",
+      "trams",
+      "ferries"
+    ],
+    "special": [
+      "next",
+      "latest",
+      "late"
+    ],
+    "line_a": [
+      "red",
+      "blue"
+    ],
+    "line_b": [
+      "green",
+      "gold"
+    ],
+    "default_limit": [
+      2,
+      3
+    ],
+    "known_id": [
+      101,
+      204
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, HTTPException\n\napp = FastAPI()\n\nFLEET = {101: \"{{line_a}}\", 204: \"{{line_b}}\", 350: \"{{line_a}}\", 412: \"{{line_a}}\", 520: \"{{line_b}}\"}\n\n\ndef one(vehicle_id: int) -> dict[str, object]:\n    if vehicle_id not in FLEET:\n        raise HTTPException(status_code=404, detail=\"Not in the fleet\")\n    return {\"route\": \"one\", \"id\": vehicle_id, \"line\": FLEET[vehicle_id]}\n\n\ndef special() -> dict[str, object]:\n    return {\"route\": \"{{special}}\", \"id\": 350}\n\n\ndef search(line: str | None, limit: int) -> dict[str, object]:\n    ids = [i for i, ln in FLEET.items() if line is None or ln == line][:limit]\n    return {\"route\": \"search\", \"count\": len(ids), \"ids\": ids}\n\n\n# >>> EDIT START\n@app.get(\"/{{resource}}/{vehicle_id}\")\nasync def get_one(vehicle_id):\n    return one(vehicle_id)\n\n\n@app.get(\"/{{resource}}/{{special}}\")\nasync def get_special():\n    return special()\n\n\n@app.get(\"/{{resource}}\")\nasync def get_many():\n    return search(None, 100)\n# <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Vehicle {{known_id}}",
+      "request": {
+        "method": "GET",
+        "path": "/{{resource}}/{{known_id}}"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "route": "one",
+        "id": "{{known_id}}"
+      }
+    },
+    {
+      "name": "The {{special}} board",
+      "request": {
+        "method": "GET",
+        "path": "/{{resource}}/{{special}}"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "route": "{{special}}"
+      }
+    },
+    {
+      "name": "{{line_b}} line",
+      "request": {
+        "method": "GET",
+        "path": "/{{resource}}",
+        "query": "line={{line_b}}&limit=10"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "route": "search",
+        "count": 2
+      }
+    }
+  ],
+  "hidden_tests": {
+    "tests": [
+      {
+        "name": "unknown vehicle",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}/999"
+        },
+        "expect_status": 404
+      },
+      {
+        "name": "vehicle id is text",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}/abc"
+        },
+        "expect_status": 422
+      },
+      {
+        "name": "vehicle 520",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}/520"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "route": "one",
+          "id": 520,
+          "line": "{{line_b}}"
+        }
+      },
+      {
+        "name": "default search",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "route": "search",
+          "count": "{{default_limit}}"
+        }
+      },
+      {
+        "name": "{{line_a}} line",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}",
+          "query": "line={{line_a}}&limit=10"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 3
+        }
+      },
+      {
+        "name": "{{line_a}} limited to 1",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}",
+          "query": "line={{line_a}}&limit=1"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 1
+        }
+      },
+      {
+        "name": "unknown line",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}",
+          "query": "line=purple&limit=10"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 0
+        }
+      },
+      {
+        "name": "limit is text",
+        "request": {
+          "method": "GET",
+          "path": "/{{resource}}",
+          "query": "limit=abc"
+        },
+        "expect_status": 422
+      },
+      {
+        "name": "POST is not a route here",
+        "request": {
+          "method": "POST",
+          "path": "/{{resource}}"
+        },
+        "expect_status": 405
+      }
+    ]
+  },
+  "reference_solution": "@app.get(\"/{{resource}}/{{special}}\")\nasync def get_special() -> dict[str, object]:\n    return special()\n\n\n@app.get(\"/{{resource}}/{vehicle_id}\")\nasync def get_one(vehicle_id: int) -> dict[str, object]:\n    return one(vehicle_id)\n\n\n@app.get(\"/{{resource}}\")\nasync def get_many(line: str | None = None, limit: int = {{default_limit}}) -> dict[str, object]:\n    return search(line, limit)\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "FastAPI checks routes top to bottom and takes the first path that matches. Which path also matches /{{resource}}/{{special}}?"
+    },
+    {
+      "tier": 2,
+      "text": "Put the fixed path first, give vehicle_id a type, and let the search take `line` and `limit` as parameters."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: @app.get(\"/{{resource}}/{{special}}\") above @app.get(\"/{{resource}}/{vehicle_id}\") with vehicle_id: int."
+    }
+  ],
+  "dialogue": {
+    "start": "Dispatcher on duty. Every request, the right platform.",
+    "success": "Perfect dispatch! Not one request on the wrong platform.",
+    "fail": "Some requests reached the wrong handler. Check route order and types."
+  }
+}

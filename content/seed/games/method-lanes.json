@@ -1,0 +1,96 @@
+{
+  "slug": "method-lanes",
+  "game_type": "status_codes",
+  "title": "Method Lanes",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "Four actions share the {{thing}} desk, but every one of them is waiting in the GET lane. Requests for the other three bounce with 405 Method Not Allowed.",
+    "goal": "Put each action on the HTTP method that means it: reading a {{thing}}, sending a new one, changing part of one, and cancelling one."
+  },
+  "objective": "Every request finds its action because it used the right method.",
+  "rules": [
+    "Reading a {{thing}} never changes anything.",
+    "Sending creates a new {{thing}}.",
+    "Changing a {{thing}}'s address updates only part of it.",
+    "Cancelling removes the {{thing}}."
+  ],
+  "variant_params": {
+    "thing": [
+      "parcel",
+      "letter",
+      "crate"
+    ],
+    "item_id": [
+      7,
+      12,
+      31
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, Response\n\napp = FastAPI()\n\n# The HTTP method each action listens on\n# >>> EDIT START\nREAD = \"GET\"\nSEND = \"GET\"\nCHANGE = \"GET\"\nCANCEL = \"GET\"\n# <<< EDIT END\n\n\nasync def read(item_id: int) -> dict[str, object]:\n    return {\"action\": \"read\", \"id\": item_id}\n\n\nasync def send() -> dict[str, object]:\n    return {\"action\": \"send\"}\n\n\nasync def change(item_id: int) -> dict[str, object]:\n    return {\"action\": \"change\", \"id\": item_id}\n\n\nasync def cancel(item_id: int) -> Response:\n    return Response(status_code=204)\n\n\napp.add_api_route(\"/{{thing}}s/{item_id}\", read, methods=[READ])\napp.add_api_route(\"/{{thing}}s\", send, methods=[SEND], status_code=201)\napp.add_api_route(\"/{{thing}}s/{item_id}\", change, methods=[CHANGE])\napp.add_api_route(\"/{{thing}}s/{item_id}\", cancel, methods=[CANCEL])\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Read {{thing}} {{item_id}}",
+      "request": {
+        "method": "GET",
+        "path": "/{{thing}}s/{{item_id}}"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "action": "read"
+      }
+    },
+    {
+      "name": "Send a new {{thing}}",
+      "request": {
+        "method": "POST",
+        "path": "/{{thing}}s"
+      },
+      "expect_status": 201
+    },
+    {
+      "name": "Change its address",
+      "request": {
+        "method": "PATCH",
+        "path": "/{{thing}}s/{{item_id}}"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "action": "change"
+      }
+    },
+    {
+      "name": "Cancel it",
+      "request": {
+        "method": "DELETE",
+        "path": "/{{thing}}s/{{item_id}}"
+      },
+      "expect_status": 204
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "READ = \"GET\"\nSEND = \"POST\"\nCHANGE = \"PATCH\"\nCANCEL = \"DELETE\"\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Same path, different method, different meaning. Which method creates something new?"
+    },
+    {
+      "tier": 2,
+      "text": "Changing only part of a {{thing}} is not PUT (that replaces all of it)."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: SEND = \"POST\", and removing a {{thing}} has a method named exactly after it."
+    }
+  ],
+  "dialogue": {
+    "start": "Everyone is stuck in the GET lane. Sort them out!",
+    "success": "Every lane flows. Methods say what to do, and the tower listens.",
+    "fail": "Some requests still hit a closed lane (405). Check which action they wanted."
+  }
+}

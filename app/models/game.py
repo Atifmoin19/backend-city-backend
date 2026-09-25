@@ -15,6 +15,7 @@ Json = dict[str, Any]
 class Game(UUIDPrimaryKey, CreatedAt, Base):
     __tablename__ = "games"
 
+    slug: Mapped[str] = mapped_column(String(80), unique=True)
     topic_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("topics.id", ondelete="CASCADE"), index=True
     )
@@ -42,6 +43,9 @@ class GameVersion(UUIDPrimaryKey, CreatedAt, Base):
         ForeignKey("games.id", ondelete="CASCADE"), index=True
     )
     version: Mapped[int]
+    title: Mapped[str] = mapped_column(String(120), default="")
+    objective: Mapped[str] = mapped_column(Text, default="")
+    rules: Mapped[list[str]] = mapped_column(JSONB, default=list)
     scenario: Mapped[Json] = mapped_column(JSONB, default=dict)
     starter_code: Mapped[str] = mapped_column(Text)
     editable_region: Mapped[Json] = mapped_column(JSONB, default=dict)

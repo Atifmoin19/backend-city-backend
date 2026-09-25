@@ -1,8 +1,19 @@
-"""Run game source + tests in an isolated, resource-limited Python subprocess."""
+"""Run game source + tests in an isolated, resource-limited Python process.
+
+Two engines, same result:
+  * warm (default): a long-lived fork server with FastAPI/Pydantic already imported forks
+    one locked-down child per grade (~milliseconds of startup instead of seconds on a
+    small CPU);
+  * cold: a fresh interpreter per grade (fallback when the fork server can't start).
+
+Scoring happens HERE, never in the sandbox: children only receive the requests, and their
+report is checked against the expected results that stay in this process.
+"""
 
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -11,10 +22,15 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import get_settings
+from harness.runner import contains
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]  # contains harness/
 ENTRY = Path(__file__).with_name("entry.py")
 MAX_OUTPUT_BYTES = 256_000
+TIMEOUT_EXIT = 124  # child exit code when the in-process code timer fires
+SANDBOX_ENV = {"PATH": "/usr/bin:/bin"}  # never inherit app secrets
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -30,15 +46,75 @@ class SandboxLimits:
         return self.startup_seconds + self.timeout_seconds
 
 
-TIMEOUT_EXIT = 124  # child exit code when the in-process code timer fires
-
-
 @dataclass(frozen=True)
 class SandboxResult:
     report: dict[str, Any] | None
     timed_out: bool = False
     crashed: bool = False
     stderr: str = ""
+
+
+def _python() -> str:
+    return get_settings().sandbox_python or sys.executable
+
+
+def _requests_only(tests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """What the child may see: names and requests, no expected results."""
+    return [{"name": t["name"], "request": t["request"], "expect_status": 0} for t in tests]
+
+
+def score(tests: list[dict[str, Any]], raw: Any) -> SandboxResult:
+    """Validate a child's report and decide pass/fail here, from our own expectations."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("ok"), bool):
+        return SandboxResult(report=None, crashed=True)
+    if not raw["ok"]:
+        return SandboxResult(report={"ok": False, "error": str(raw.get("error")), "results": []})
+    results = raw.get("results")
+    if not isinstance(results, list) or len(results) != len(tests):
+        return SandboxResult(report=None, crashed=True)
+    scored = []
+    for test, got in zip(tests, results, strict=True):
+        status = got.get("status") if isinstance(got, dict) else None
+        if not isinstance(status, int) or isinstance(status, bool):
+            return SandboxResult(report=None, crashed=True)
+        body = got.get("body")
+        expected_body = test.get("expect_body")
+        scored.append(
+            {
+                "name": test["name"],
+                "request": test["request"],
+                "expect_status": test["expect_status"],
+                "status": status,
+                "passed": status == test["expect_status"]
+                and (expected_body is None or contains(body, expected_body)),
+                "body": body,
+            }
+        )
+    return SandboxResult(report={"ok": True, "error": None, "results": scored})
+
+
+async def execute(source: str, tests: list[dict[str, Any]], limits: SandboxLimits) -> SandboxResult:
+    job = {
+        "source": source,
+        "tests": _requests_only(tests),
+        "timeout": limits.timeout_seconds,
+        "memory_mb": limits.memory_mb,
+    }
+    if get_settings().sandbox_warm:
+        try:
+            outcome, raw = await warm_sandbox.run(job, limits)
+        except WarmUnavailableError:
+            log.warning("warm sandbox unavailable; grading with a cold interpreter")
+        else:
+            if outcome == "timeout":
+                return SandboxResult(report=None, timed_out=True)
+            if outcome != "ok":
+                return SandboxResult(report=None, crashed=True)
+            return score(tests, raw)
+    return await _execute_cold(job, tests, limits)
+
+
+# --- cold engine ---
 
 
 def _apply_rlimits(limits: SandboxLimits) -> None:  # pragma: no cover — runs in child
@@ -57,14 +133,9 @@ def _apply_rlimits(limits: SandboxLimits) -> None:  # pragma: no cover — runs 
     os.setsid()
 
 
-def _python() -> str:
-    return get_settings().sandbox_python or sys.executable
-
-
-async def execute(source: str, tests: list[dict[str, Any]], limits: SandboxLimits) -> SandboxResult:
-    payload = json.dumps(
-        {"source": source, "tests": tests, "timeout": limits.timeout_seconds}
-    ).encode()
+async def _execute_cold(
+    job: dict[str, Any], tests: list[dict[str, Any]], limits: SandboxLimits
+) -> SandboxResult:
     with tempfile.TemporaryDirectory(prefix="bc-sbx-") as workdir:
         proc = await asyncio.create_subprocess_exec(
             _python(),
@@ -76,12 +147,12 @@ async def execute(source: str, tests: list[dict[str, Any]], limits: SandboxLimit
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=workdir,
-            env={"PATH": "/usr/bin:/bin", "HOME": workdir},  # never inherit app secrets
+            env={**SANDBOX_ENV, "HOME": workdir},
             preexec_fn=lambda: _apply_rlimits(limits),
         )
         try:
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(payload), timeout=limits.wall_seconds
+                proc.communicate(json.dumps(job).encode()), timeout=limits.wall_seconds
             )
         except TimeoutError:
             proc.kill()
@@ -94,6 +165,96 @@ async def execute(source: str, tests: list[dict[str, Any]], limits: SandboxLimit
     if proc.returncode != 0 or len(stdout) > MAX_OUTPUT_BYTES:
         return SandboxResult(report=None, crashed=True, stderr=err)
     try:
-        return SandboxResult(report=json.loads(stdout))
+        return score(tests, json.loads(stdout))
     except ValueError:
         return SandboxResult(report=None, crashed=True, stderr=err)
+
+
+# --- warm engine ---
+
+
+class WarmUnavailableError(RuntimeError):
+    pass
+
+
+class WarmSandbox:
+    """Client for the fork server (entry.py --serve). One job at a time; restarts on failure."""
+
+    def __init__(self) -> None:
+        self._proc: asyncio.subprocess.Process | None = None
+        self._lock: asyncio.Lock | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._jobs = 0
+        self._workdir = tempfile.mkdtemp(prefix="bc-warm-")
+
+    def _bind(self) -> asyncio.Lock:
+        """The process and lock belong to one event loop (tests may use several)."""
+        loop = asyncio.get_running_loop()
+        if self._loop is not loop or self._lock is None:
+            self._loop, self._lock, self._proc = loop, asyncio.Lock(), None
+        return self._lock
+
+    async def _start(self, startup_seconds: float) -> asyncio.subprocess.Process:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                _python(),
+                "-I",
+                "-B",
+                str(ENTRY),
+                str(BACKEND_ROOT),
+                "--serve",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+                cwd=self._workdir,
+                env={**SANDBOX_ENV, "HOME": self._workdir},
+                limit=MAX_OUTPUT_BYTES * 2,
+            )
+            assert proc.stdout is not None  # noqa: S101 — PIPE requested above
+            line = await asyncio.wait_for(proc.stdout.readline(), timeout=startup_seconds)
+            if json.loads(line or b"{}").get("ready") is not True:
+                raise WarmUnavailableError("fork server did not report ready")
+        except (OSError, TimeoutError, ValueError) as exc:
+            raise WarmUnavailableError(str(exc)) from exc
+        return proc
+
+    async def _kill(self) -> None:
+        proc, self._proc = self._proc, None
+        if proc is not None and proc.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            await proc.wait()
+
+    async def run(self, job: dict[str, Any], limits: SandboxLimits) -> tuple[str, Any]:
+        async with self._bind():
+            if self._proc is None or self._proc.returncode is not None:
+                self._proc = await self._start(limits.startup_seconds)
+            proc = self._proc
+            assert proc.stdin is not None and proc.stdout is not None  # noqa: S101
+            self._jobs += 1
+            job_id = self._jobs
+            try:
+                proc.stdin.write(json.dumps({**job, "id": job_id}).encode() + b"\n")
+                await proc.stdin.drain()
+                # the server kills the child after timeout + 1 s; allow a margin on top
+                line = await asyncio.wait_for(
+                    proc.stdout.readline(), timeout=limits.timeout_seconds + 5
+                )
+                reply = json.loads(line)
+            except (TimeoutError, OSError, ValueError, asyncio.LimitOverrunError):
+                await self._kill()
+                return "crashed", None
+            if reply.get("id") != job_id:
+                await self._kill()
+                return "crashed", None
+            return str(reply["outcome"]), reply.get("report")
+
+    async def warm_up(self) -> None:
+        """Start the server ahead of the first grade (called at app startup)."""
+        settings = get_settings()
+        async with self._bind():
+            if self._proc is None:
+                self._proc = await self._start(settings.sandbox_startup_seconds)
+
+
+warm_sandbox = WarmSandbox()

@@ -1,11 +1,23 @@
 import sys
+from collections.abc import Iterator
 
 import pytest
 
+from app.core.config import get_settings
 from app.sandbox.executor import SandboxLimits, execute
 from app.sandbox.policy import check_snippet
 
 LIMITS = SandboxLimits(timeout_seconds=4, memory_mb=256)
+
+
+@pytest.fixture(params=["warm", "cold"])
+def engine(request: pytest.FixtureRequest) -> Iterator[str]:
+    """Every runtime defense must hold for both the fork server and fresh interpreters."""
+    settings = get_settings()
+    before = settings.sandbox_warm
+    settings.sandbox_warm = request.param == "warm"
+    yield request.param
+    settings.sandbox_warm = before
 
 
 @pytest.mark.parametrize(
@@ -37,12 +49,16 @@ def test_policy_rejects_oversized_snippet() -> None:
 
 # --- runtime defenses (these bypass the AST policy on purpose) ---
 
+pytestmark_engine = pytest.mark.usefixtures("engine")
 
+
+@pytestmark_engine
 async def test_sandbox_times_out_infinite_loop() -> None:
     result = await execute("while True:\n    pass\n", [], SandboxLimits(1.0, 256))
     assert result.timed_out
 
 
+@pytestmark_engine
 async def test_code_timer_cannot_be_swallowed_by_except_exception() -> None:
     src = (
         "while True:\n    try:\n        while True:\n            pass\n"
@@ -52,6 +68,7 @@ async def test_code_timer_cannot_be_swallowed_by_except_exception() -> None:
     assert result.timed_out
 
 
+@pytestmark_engine
 async def test_wall_clock_backstop_kills_code_that_swallows_the_timer() -> None:
     src = (
         "while True:\n    try:\n        while True:\n            pass\n"
@@ -61,6 +78,7 @@ async def test_wall_clock_backstop_kills_code_that_swallows_the_timer() -> None:
     assert result.timed_out
 
 
+@pytestmark_engine
 async def test_sandbox_blocks_network() -> None:
     src = "import socket\nsocket.create_connection(('example.com', 80), timeout=1)\napp = None\n"
     result = await execute(src, [], LIMITS)
@@ -69,6 +87,7 @@ async def test_sandbox_blocks_network() -> None:
     assert "Blocked by sandbox" in result.report["error"]
 
 
+@pytestmark_engine
 async def test_sandbox_blocks_file_writes() -> None:
     src = "with open('pwned.txt', 'w') as f:\n    f.write('x')\napp = None\n"
     result = await execute(src, [], LIMITS)
@@ -76,6 +95,7 @@ async def test_sandbox_blocks_file_writes() -> None:
     assert "Blocked by sandbox" in result.report["error"]
 
 
+@pytestmark_engine
 async def test_sandbox_does_not_leak_env_secrets() -> None:
     src = (
         "import os\n"
@@ -93,6 +113,7 @@ async def test_sandbox_does_not_leak_env_secrets() -> None:
     assert "DATABASE_URL" not in body
 
 
+@pytestmark_engine
 async def test_sandbox_captures_print_output() -> None:
     result = await execute("print('noise')\napp = object()\n", [], LIMITS)
     assert result.report is not None
@@ -100,6 +121,90 @@ async def test_sandbox_captures_print_output() -> None:
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="RLIMIT_AS is only enforced on Linux")
+@pytestmark_engine
 async def test_sandbox_enforces_memory_limit() -> None:
     result = await execute("x = bytearray(1024 * 1024 * 1024)\napp = None\n", [], LIMITS)
     assert result.report is None or not result.report["ok"]
+
+
+FORGED = """
+import uuid
+row = '{"name": "x", "request": {}, "expect_status": 201, "status": 201, "passed": true}'
+fake = '{"ok": true, "error": null, "results": [' + ','.join([row] * 3) + ']}'
+uuid.os.write(1, fake.encode())
+uuid.os._exit(0)
+"""
+
+
+@pytestmark_engine
+async def test_forged_report_cannot_award_passes() -> None:
+    """Allowed modules expose `os` (uuid.os); a child writing its own verdict must not score."""
+    assert check_snippet(FORGED, max_chars=4000) == []  # the AST policy alone can't stop this
+    tests = [
+        {"name": "t", "request": {"method": "GET", "path": "/"}, "expect_status": 201},
+        {"name": "u", "request": {"method": "GET", "path": "/u"}, "expect_status": 422},
+    ]
+    result = await execute("from fastapi import FastAPI\napp = FastAPI()\n" + FORGED, tests, LIMITS)
+    passed = sum(r["passed"] for r in result.report["results"]) if result.report else 0
+    assert passed == 0
+
+
+@pytestmark_engine
+async def test_child_never_sees_expected_results() -> None:
+    src = (
+        "from fastapi import FastAPI, Request\n"
+        "app = FastAPI()\n"
+        "@app.get('/')\n"
+        "async def peek() -> dict[str, object]:\n"
+        "    import gc\n"
+        "    found = [o for o in gc.get_objects() if isinstance(o, dict)]\n"
+        "    return {'leak': [o for o in found if o.get('expect_status') == 418]}\n"
+    )
+    tests = [{"name": "t", "request": {"method": "GET", "path": "/"}, "expect_status": 418}]
+    result = await execute(src, tests, LIMITS)
+    assert result.report is not None
+    assert result.report["results"][0]["body"] == {"leak": []}
+
+
+@pytestmark_engine
+async def test_scores_statuses_and_bodies_in_the_parent() -> None:
+    src = (
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "@app.get('/t/{i}')\n"
+        "async def t(i: int) -> dict[str, int]:\n"
+        "    return {'id': i}\n"
+    )
+    tests = [
+        {
+            "name": "a",
+            "request": {"method": "GET", "path": "/t/1"},
+            "expect_status": 200,
+            "expect_body": {"id": 1},
+        },
+        {
+            "name": "b",
+            "request": {"method": "GET", "path": "/t/2"},
+            "expect_status": 200,
+            "expect_body": {"id": 3},
+        },
+        {"name": "c", "request": {"method": "GET", "path": "/t/x"}, "expect_status": 422},
+    ]
+    result = await execute(src, tests, LIMITS)
+    assert result.report is not None
+    assert [r["passed"] for r in result.report["results"]] == [True, False, True]
+
+
+async def test_warm_engine_is_fast_after_the_first_grade() -> None:
+    import time
+
+    settings = get_settings()
+    settings.sandbox_warm = True
+    tests = [{"name": "t", "request": {"method": "GET", "path": "/"}, "expect_status": 404}]
+    src = "from fastapi import FastAPI\napp = FastAPI()\n"
+    await execute(src, tests, LIMITS)  # starts the server if needed
+    start = time.monotonic()
+    for _ in range(3):
+        result = await execute(src, tests, LIMITS)
+        assert result.report is not None and result.report["results"][0]["passed"]
+    assert (time.monotonic() - start) / 3 < 1.0

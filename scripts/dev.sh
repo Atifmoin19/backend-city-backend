@@ -38,6 +38,9 @@ uv sync --quiet
 echo "▶ Applying migrations…"
 uv run alembic upgrade head
 
+echo "▶ Syncing seed content (content/seed → DB)…"
+uv run python -m app.games.seed
+
 echo "▶ API on http://localhost:${PORT}  (docs: http://localhost:${PORT}/docs)"
 exec uv run uvicorn app.main:app --host 127.0.0.1 --port "${PORT}" --reload \
   --reload-dir app --reload-dir harness --reload-dir content

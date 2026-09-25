@@ -1,0 +1,81 @@
+{
+  "slug": "signal-codes",
+  "game_type": "status_codes",
+  "title": "Signal Codes",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The Signal Tower answers every request with a three-digit code, and right now every answer is 500: the city thinks the tower is on fire.",
+    "goal": "Set the three codes the tower sends back: a {{thing}} that exists, a {{thing}} that was just created, and a {{thing}} that doesn't exist."
+  },
+  "objective": "Every answer carries the status code that tells the truth.",
+  "rules": [
+    "Found a {{thing}}: it worked, here is the data.",
+    "Created a new {{thing}}: a new thing exists now.",
+    "No such {{thing}}: that resource doesn't exist."
+  ],
+  "variant_params": {
+    "thing": [
+      "parcel",
+      "letter",
+      "crate"
+    ],
+    "item_id": [
+      7,
+      12,
+      31
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI\nfrom fastapi.responses import JSONResponse\n\napp = FastAPI()\n\nSTORE: dict[int, str] = {}\nSTORE[{{item_id}}] = \"on its way\"\n\n# The code the tower sends back for each outcome\n# >>> EDIT START\nFOUND = 500\nCREATED = 500\nMISSING = 500\n# <<< EDIT END\n\n\ndef signal(code: int, **body: object) -> JSONResponse:\n    return JSONResponse(status_code=code, content=body)\n\n\n@app.get(\"/{{thing}}s/{item_id}\")\nasync def track(item_id: int) -> JSONResponse:\n    if item_id not in STORE:\n        return signal(MISSING, error=\"no such {{thing}}\")\n    return signal(FOUND, id=item_id, status=STORE[item_id])\n\n\n@app.post(\"/{{thing}}s\")\nasync def send() -> JSONResponse:\n    return signal(CREATED, id=99, status=\"accepted\")\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Track a {{thing}}",
+      "request": {
+        "method": "GET",
+        "path": "/{{thing}}s/{{item_id}}"
+      },
+      "expect_status": 200
+    },
+    {
+      "name": "Send a new {{thing}}",
+      "request": {
+        "method": "POST",
+        "path": "/{{thing}}s"
+      },
+      "expect_status": 201
+    },
+    {
+      "name": "Track a {{thing}} that isn't there",
+      "request": {
+        "method": "GET",
+        "path": "/{{thing}}s/999"
+      },
+      "expect_status": 404
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "FOUND = 200\nCREATED = 201\nMISSING = 404\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Read the first digit: 2xx means it worked, 4xx means the client asked for something wrong."
+    },
+    {
+      "tier": 2,
+      "text": "\"It worked\" and \"a new thing was created\" are both 2xx, but not the same code. The briefing's table has both."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: FOUND = 200, CREATED = 201, and a missing {{thing}} is the famous 4xx."
+    }
+  ],
+  "dialogue": {
+    "start": "Every answer says 500. The whole city thinks we crashed!",
+    "success": "Clear signals! Every tower knows exactly what happened.",
+    "fail": "Some answers still send the wrong signal. Check the codes in the log."
+  }
+}

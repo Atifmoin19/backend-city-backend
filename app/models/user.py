@@ -21,3 +21,4 @@ class User(UUIDPrimaryKey, CreatedAt, Base):
     is_blocked: Mapped[bool] = mapped_column(default=False)
     experience_level: Mapped[str | None] = mapped_column(String(32))
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

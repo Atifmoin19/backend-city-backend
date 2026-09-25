@@ -2,6 +2,46 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
+## 2026-09-26 — Session 2: progress API, content depth, ops, admin MVP
+
+### Done
+- **Content in the DB.** `content/seed/curriculum.json` + `games/*.json` sync into tracks →
+  levels → chapters → topics → games → versions (`python -m app.games.seed`, run on every
+  start). Games are read from `game_versions`; attempt tokens pin the version + mode.
+- **Progress API**: `GET /me/progress` (per track), lessons, practice passes, onboarding,
+  one-time import of browser progress (never checkpoints). Checkpoint grades save an attempt
+  and `topic_progress`; hint tiers cost 5 points each and block 3 stars; optional retest
+  cooldown (429 `retest_cooldown`); consecutive-fail count for the soft-fail recap.
+- **8 new games** (all pass `tests/test_content.py`: reference 100% on 4 seeds, starter below
+  the pass mark): Signal Tower *Signal Codes*, *Method Lanes*, checkpoint *Tower Relay*;
+  Router Station *Platform Paths*, *Query Filters*, checkpoint *Route Dispatcher*; Gatehouse
+  practice *Ticket Booth*, *Badge Check*. Hidden tests can be templated lists in content.
+- Harness 0.2.0: optional `expect_body` (subset match) so routing games check the handler.
+  `render_json` now keeps a placeholder's type (`"{{n}}"` → number).
+- **Security fix:** learner code could forge a 100% checkpoint (`uuid.os.write(1, fake)` +
+  `_exit(0)`; the AST policy can't see it). The sandbox now gets requests only; the API scores.
+- **Warm sandbox**: pre-imported fork server; grading at `--cpus=0.1` 11 s → ~0.7 s.
+  Cold interpreter stays as fallback. Both engines run every sandbox defense test.
+- **Ops**: keep-alive GitHub Action (every 10 min); rate limits key on the real client IP
+  via `X-BC-Client-IP` + shared secret from the frontend proxy; games routes per user.
+- **Admin MVP**: content tree, topic settings, game versions (save draft → test-run with every
+  hidden case → publish, blocked unless the reference passes on seeds 1-3), hide/show,
+  learner list/search/detail, block/role/reset (super admin). `last_active_at` now tracked.
+- 151 tests pass locally; 138 of the pre-admin suite also verified in the Linux image.
+
+### Next up (owner decides)
+1. Release: set `PROXY_SHARED_SECRET` on Render + Vercel, push backend, bump frontend
+   `harness.lock`, push frontend (DEPLOY.md, "Releasing the progress / content / admin update").
+2. Email flows: verify email, forgot/reset password (EmailJS).
+3. Admin: create new games/topics from the panel (today: edit existing ones), audit log.
+4. Academy practice games (Python basics); Status Code Speed Round (needs a quiz game UI).
+5. Phase 2: AI hints (Byte), XP/streaks/badges, Data Vaults.
+
+### Known issues
+- The frontend's topic → game list is static (`src/content/topics.ts`); a game an admin hides
+  still shows as a step (it then 404s). Creating games from the admin is not built yet.
+- Warm sandbox handles one grade at a time (fine at current traffic; ~1 s each).
+
 ## 2026-09-26 — Session 1d: hardening
 
 ### Done

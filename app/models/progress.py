@@ -29,3 +29,4 @@ class TopicProgress(Base):
     stars: Mapped[int] = mapped_column(default=0)
     attempts_count: Mapped[int] = mapped_column(default=0)
     passed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lesson_done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

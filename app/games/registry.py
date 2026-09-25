@@ -1,13 +1,19 @@
-from app.games.templates.base import GameTemplate
-from app.games.templates.bouncer import BouncerTemplate
+from app.games.content import GameBody
+from app.games.templates.base import HiddenTestGenerator, TemplatedTests
+from app.games.templates.bouncer import SignupBoundaries
 
-TEMPLATES: dict[str, GameTemplate] = {
-    "bouncer": BouncerTemplate(),
+GENERATORS: dict[str, HiddenTestGenerator] = {
+    "signup_boundaries": SignupBoundaries(),
 }
+_TEMPLATED = TemplatedTests()
 
 
-def template_for(game_type: str) -> GameTemplate:
+def generator_for(game: GameBody) -> HiddenTestGenerator:
+    """Code generator named in `hidden_tests.generator`, else the templated test list."""
+    name = game.hidden_tests.get("generator")
+    if name is None:
+        return _TEMPLATED
     try:
-        return TEMPLATES[game_type]
+        return GENERATORS[str(name)]
     except KeyError as exc:
-        raise LookupError(f"No template for game type {game_type!r}") from exc
+        raise LookupError(f"No hidden-test generator {name!r}") from exc

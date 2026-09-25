@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Text
+from sqlalchemy import ForeignKey, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAt, UUIDPrimaryKey
@@ -8,6 +8,8 @@ from app.db.base import Base, CreatedAt, UUIDPrimaryKey
 
 class Attempt(UUIDPrimaryKey, CreatedAt, Base):
     __tablename__ = "attempts"
+    # grading finds the open attempt for one variant (hint usage lives on it)
+    __table_args__ = (Index("ix_attempts_user_version_seed", "user_id", "game_version_id", "seed"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True

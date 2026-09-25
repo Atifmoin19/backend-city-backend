@@ -76,6 +76,7 @@ You don't create tables by hand: the API runs `alembic upgrade head` every time 
    | `COOKIE_SECURE`       | `true`                                                  |
    | `REFRESH_COOKIE_PATH` | `/api/auth`                                             |
    | `CORS_ORIGINS`        | `["http://localhost:3000"]` for now (step 4 updates it) |
+   | `PROXY_SHARED_SECRET` | a second random secret (same value on Vercel, step 3); lets rate limits see each learner's real IP |
 
    Do **not** set `PORT` (Render injects it) or `SANDBOX_PYTHON` (the image sets it).
    Leave `COOKIE_DOMAIN` unset.
@@ -113,6 +114,7 @@ Free instances sleep after 15 minutes without traffic; the first request then ta
    | --------------------------- | ------------------------------------------------------------- |
    | `BACKEND_URL`             | `https://backend-city-api.onrender.com` (no trailing `/`) |
    | `NEXT_PUBLIC_PYODIDE_URL` | `https://cdn.jsdelivr.net/pyodide/v314.0.7/full/`           |
+   | `PROXY_SHARED_SECRET`     | the same value as on Render |
 
    Do **not** set `HARNESS_LOCAL_PATH` (its absence is what triggers the GitHub download).
 4. **Deploy**. The build log should contain:
@@ -150,9 +152,35 @@ Free instances sleep after 15 minutes without traffic; the first request then ta
   `harness.lock` to that backend commit and push the frontend.
 - Vercel preview deploys (branches/PRs) use the same `BACKEND_URL`; they work because the API
   is reached through the same-origin rewrite.
-- Optional keep-warm: a free cron (e.g. cron-job.org) hitting `/health` every 10 min avoids
-  cold starts. One always-on free Render service fits the monthly free hours.
+- Keep-warm: `.github/workflows/keep-alive.yml` in the backend repo pings `/health` every
+  10 min (set the repo variable `API_HEALTH_URL` if the URL changes). GitHub pauses scheduled
+  workflows after 60 days without commits: re-enable it under **Actions**. One always-on
+  free Render service fits the monthly free hours.
+- Content: every deploy runs `python -m app.games.seed`, which adds new seed games and new
+  seed versions but never overwrites a version an admin published.
+- First admin: sign up, then in the Neon SQL editor run
+  `update users set role = 'super_admin' where email = 'you@example.com';` and sign in again.
 - Custom domain later: add it in Vercel; nothing changes on Render (cookies stay first-party).
+
+---
+
+## Releasing the progress / content / admin update (2026-09-26)
+
+Both repos changed together and the shared harness changed (v0.2.0: `expect_body`), so order
+matters:
+
+1. Generate a secret (`openssl rand -hex 32`) and add `PROXY_SHARED_SECRET` to **Render** and
+   **Vercel** (same value). Nothing breaks if you skip it; rate limits just stay per-Vercel-IP.
+2. Merge and push the **backend**. Render runs the migration and the content seed on start;
+   the log shows `[seed] created ...`.
+3. Set `commit` in the frontend `harness.lock` to that backend commit, then push the
+   **frontend**.
+4. Smoke test: sign in → Signal Tower → *Signal Codes* practice → the district page shows it
+   done after a reload on another device.
+
+Existing learners keep their onboarding and finished briefings (moved from the browser on
+their next visit). Checkpoint results kept only in the browser are not moved: they only count
+when graded on the server, so those learners retake one checkpoint.
 
 ---
 
@@ -168,5 +196,5 @@ Free instances sleep after 15 minutes without traffic; the first request then ta
 | First click after a while gives 504 / "waking up"             | Render cold start → wait ~60 s; the app retries                                                                       |
 | Signed in, then instantly signed out on reload                | `COOKIE_SECURE` / `REFRESH_COOKIE_PATH` wrong, or `BACKEND_URL` ends in `/api`                                 |
 | Practice stuck on "Starting your server"                      | Open`/harness/manifest.json` on the site; if 404 the harness download failed → check the build log                  |
-| Checkpoint says "Your code took too long" for a correct answer | Sandbox startup was counted against the learner on the slow free CPU → fixed with `SANDBOX_STARTUP_SECONDS` (default 20); grading takes ~10 s on Render free |
+| Checkpoint says "Your code took too long" for a correct answer | Sandbox startup was counted against the learner on the slow free CPU → fixed with `SANDBOX_STARTUP_SECONDS` (default 20); with the warm sandbox (default) a grade takes about 1 s after the server starts |
 | Everyone gets 429 at once                                     | Rate limiter sees one shared IP → check client IPs in the Render log; tell Claude to key limits on `X-Forwarded-For` |

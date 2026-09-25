@@ -1,9 +1,9 @@
-"""Bouncer (validation) template: hidden tests probe every boundary of the variant's rules."""
+"""Signup-gate hidden tests: probe every boundary of the variant's rules with random names."""
 
 import random
 from typing import Any
 
-from app.games.content import GameContent
+from app.games.content import GameBody
 from app.games.variants import Variant
 
 _NAME_CHARS = "abcdefghijklmnopqrstuvwxyz_0123456789"
@@ -17,8 +17,8 @@ def _signup(name: str, body: dict[str, Any], expect: int) -> dict[str, Any]:
     }
 
 
-class BouncerTemplate:
-    def hidden_tests(self, game: GameContent, variant: Variant) -> list[dict[str, Any]]:
+class SignupBoundaries:
+    def hidden_tests(self, game: GameBody, variant: Variant) -> list[dict[str, Any]]:
         p = variant.params
         f, a = p["field_name"], p["age_field"]
         lo, hi, nmin, nmax = p["min_age"], p["max_age"], p["name_min"], p["name_max"]

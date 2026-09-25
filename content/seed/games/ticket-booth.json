@@ -1,0 +1,108 @@
+{
+  "slug": "ticket-booth",
+  "game_type": "bouncer",
+  "title": "Ticket Booth",
+  "character": "bouncer",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The ticket booth takes any order at all: zero seats, a thousand seats, row minus five. Glitch is booking the whole arena.",
+    "goal": "Limit the numbers: `{{count_field}}` from 1 to {{max_count}}, and `row` from 1 to {{rows}}."
+  },
+  "objective": "Real orders get tickets (201). Impossible numbers bounce (422).",
+  "rules": [
+    "`{{count_field}}` is between 1 and {{max_count}}, both included.",
+    "`row` is between 1 and {{rows}}, both included.",
+    "Anything else bounces with 422."
+  ],
+  "variant_params": {
+    "count_field": [
+      "seats",
+      "quantity"
+    ],
+    "max_count": [
+      4,
+      6,
+      8
+    ],
+    "rows": [
+      20,
+      30
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\n\nclass TicketOrder(BaseModel):\n    # >>> EDIT START\n    {{count_field}}: int\n    row: int\n    # <<< EDIT END\n\n\n@app.post(\"/tickets\", status_code=201)\nasync def order(body: TicketOrder) -> dict[str, int]:\n    return {\"booked\": body.{{count_field}}, \"row\": body.row}\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "A real order",
+      "request": {
+        "method": "POST",
+        "path": "/tickets",
+        "json": {
+          "{{count_field}}": 2,
+          "row": 5
+        }
+      },
+      "expect_status": 201
+    },
+    {
+      "name": "Zero seats",
+      "request": {
+        "method": "POST",
+        "path": "/tickets",
+        "json": {
+          "{{count_field}}": 0,
+          "row": 5
+        }
+      },
+      "expect_status": 422
+    },
+    {
+      "name": "The whole arena",
+      "request": {
+        "method": "POST",
+        "path": "/tickets",
+        "json": {
+          "{{count_field}}": 99,
+          "row": 5
+        }
+      },
+      "expect_status": 422
+    },
+    {
+      "name": "Row 999",
+      "request": {
+        "method": "POST",
+        "path": "/tickets",
+        "json": {
+          "{{count_field}}": 2,
+          "row": 999
+        }
+      },
+      "expect_status": 422
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "{{count_field}}: int = Field(ge=1, le={{max_count}})\nrow: int = Field(ge=1, le={{rows}})\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "A type hint only checks that it's a number. What stops the number from being 0 or 99?"
+    },
+    {
+      "tier": 2,
+      "text": "Field() takes ge= (greater or equal) and le= (less or equal) for numbers."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: {{count_field}}: int = Field(ge=1, le=...)"
+    }
+  ],
+  "dialogue": {
+    "start": "One order at a time, and only orders that make sense.",
+    "success": "Booth secured. Glitch's arena grab bounced.",
+    "fail": "Some impossible orders got tickets. Check the numbers."
+  }
+}

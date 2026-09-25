@@ -1,0 +1,119 @@
+{
+  "slug": "badge-check",
+  "game_type": "bouncer",
+  "title": "Badge Check",
+  "character": "bouncer",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "Badges at the gate have a 6-character code and a holder's name, but the scanner accepts empty names and codes of any length.",
+    "goal": "Limit the text: `{{code_field}}` is exactly 6 characters and `{{name_field}}` has 1 to {{name_max}} characters."
+  },
+  "objective": "Real badges get in (201). Forged ones bounce (422).",
+  "rules": [
+    "`{{code_field}}` is exactly 6 characters long.",
+    "`{{name_field}}` has 1 to {{name_max}} characters.",
+    "Anything else bounces with 422."
+  ],
+  "variant_params": {
+    "code_field": [
+      "code",
+      "badge_id"
+    ],
+    "name_field": [
+      "name",
+      "holder"
+    ],
+    "name_max": [
+      16,
+      20
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\n\nclass Badge(BaseModel):\n    # >>> EDIT START\n    {{code_field}}: str\n    {{name_field}}: str\n    # <<< EDIT END\n\n\n@app.post(\"/badges\", status_code=201)\nasync def check(body: Badge) -> dict[str, str]:\n    return {\"welcome\": body.{{name_field}}}\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "A real badge",
+      "request": {
+        "method": "POST",
+        "path": "/badges",
+        "json": {
+          "{{code_field}}": "ZX-481",
+          "{{name_field}}": "Trinity"
+        }
+      },
+      "expect_status": 201
+    },
+    {
+      "name": "Code too short",
+      "request": {
+        "method": "POST",
+        "path": "/badges",
+        "json": {
+          "{{code_field}}": "ZX4",
+          "{{name_field}}": "Trinity"
+        }
+      },
+      "expect_status": 422
+    },
+    {
+      "name": "Code too long",
+      "request": {
+        "method": "POST",
+        "path": "/badges",
+        "json": {
+          "{{code_field}}": "ZX-4811",
+          "{{name_field}}": "Trinity"
+        }
+      },
+      "expect_status": 422
+    },
+    {
+      "name": "No name",
+      "request": {
+        "method": "POST",
+        "path": "/badges",
+        "json": {
+          "{{code_field}}": "ZX-481",
+          "{{name_field}}": ""
+        }
+      },
+      "expect_status": 422
+    },
+    {
+      "name": "Name too long",
+      "request": {
+        "method": "POST",
+        "path": "/badges",
+        "json": {
+          "{{code_field}}": "ZX-481",
+          "{{name_field}}": "Glitch-the-great-forger-of-badges"
+        }
+      },
+      "expect_status": 422
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "{{code_field}}: str = Field(min_length=6, max_length=6)\n{{name_field}}: str = Field(min_length=1, max_length={{name_max}})\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "An empty string is still a string. What limits how long text can be?"
+    },
+    {
+      "tier": 2,
+      "text": "Field() takes min_length= and max_length= for text. \"Exactly 6\" means both are 6."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: {{code_field}}: str = Field(min_length=6, max_length=6)"
+    }
+  ],
+  "dialogue": {
+    "start": "Show me your badge. All of it.",
+    "success": "Scanner fixed. Forged badges bounce on sight.",
+    "fail": "Some forged badges scanned green. Check the lengths."
+  }
+}

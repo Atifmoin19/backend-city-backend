@@ -2,7 +2,7 @@
 
 import traceback
 from types import ModuleType
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from harness.asgi import SimRequest, SimResponse, call
 
@@ -11,6 +11,9 @@ class TestCase(TypedDict):
     name: str
     request: SimRequest
     expect_status: int
+    # Optional: the response JSON must contain these keys/values (a subset, not equality),
+    # so routing games can check that the right handler answered. None = not checked.
+    expect_body: NotRequired[Any]
 
 
 class TestResult(TypedDict):
@@ -55,11 +58,25 @@ async def run(source: str, tests: list[TestCase]) -> RunReport:
                 "request": test["request"],
                 "expect_status": test["expect_status"],
                 "status": res["status"],
-                "passed": res["status"] == test["expect_status"],
+                "passed": res["status"] == test["expect_status"] and _body_ok(res["body"], test),
                 "body": res["body"],
             }
         )
     return {"ok": True, "error": None, "results": results}
+
+
+def _body_ok(body: Any, test: TestCase) -> bool:
+    expected = test.get("expect_body")
+    return expected is None or contains(body, expected)
+
+
+def contains(actual: Any, expected: Any) -> bool:
+    """`expected` is a subset of `actual`: dict keys recursively, anything else must be equal."""
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(
+            k in actual and contains(actual[k], v) for k, v in expected.items()
+        )
+    return bool(actual == expected)
 
 
 def _short_trace(limit: int = 1500) -> str:

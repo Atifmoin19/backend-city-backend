@@ -1,0 +1,103 @@
+{
+  "slug": "query-filters",
+  "game_type": "route_dispatcher",
+  "title": "Query Filters",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The departures board ignores everything after the question mark, so it always shows every train on every line.",
+    "goal": "Read `line` and `limit` from the query string, with sensible defaults, and pass them to the board."
+  },
+  "objective": "The board shows the line you asked for, and only as many trains as you asked for.",
+  "rules": [
+    "`line` is optional: leave it out to see every line.",
+    "`limit` defaults to {{default_limit}} trains.",
+    "`limit` is a whole number: `?limit=abc` bounces with 422."
+  ],
+  "variant_params": {
+    "line_a": [
+      "red",
+      "blue"
+    ],
+    "line_b": [
+      "green",
+      "gold"
+    ],
+    "default_limit": [
+      2,
+      3
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI\n\napp = FastAPI()\n\nDEPARTURES = [\n    {\"train\": 101, \"line\": \"{{line_a}}\"},\n    {\"train\": 102, \"line\": \"{{line_b}}\"},\n    {\"train\": 103, \"line\": \"{{line_a}}\"},\n    {\"train\": 104, \"line\": \"{{line_a}}\"},\n    {\"train\": 105, \"line\": \"{{line_b}}\"},\n]\n\n\ndef board(line: str | None, limit: int) -> dict[str, object]:\n    rows = [d for d in DEPARTURES if line is None or d[\"line\"] == line][:limit]\n    return {\"count\": len(rows), \"trains\": [d[\"train\"] for d in rows]}\n\n\n# >>> EDIT START\n@app.get(\"/departures\")\nasync def departures():\n    return board(None, 100)\n# <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "The whole board",
+      "request": {
+        "method": "GET",
+        "path": "/departures"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "count": "{{default_limit}}"
+      }
+    },
+    {
+      "name": "{{line_a}} line",
+      "request": {
+        "method": "GET",
+        "path": "/departures",
+        "query": "line={{line_a}}&limit=10"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "count": 3
+      }
+    },
+    {
+      "name": "{{line_b}} line",
+      "request": {
+        "method": "GET",
+        "path": "/departures",
+        "query": "line={{line_b}}&limit=10"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "count": 2
+      }
+    },
+    {
+      "name": "Limit is not a number",
+      "request": {
+        "method": "GET",
+        "path": "/departures",
+        "query": "limit=abc"
+      },
+      "expect_status": 422
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "@app.get(\"/departures\")\nasync def departures(line: str | None = None, limit: int = {{default_limit}}) -> dict[str, object]:\n    return board(line, limit)\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Any function parameter that isn't part of the path becomes a query parameter."
+    },
+    {
+      "tier": 2,
+      "text": "A default value makes a query parameter optional; `str | None = None` means \"maybe not sent\"."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: async def departures(line: str | None = None, limit: int = {{default_limit}})."
+    }
+  ],
+  "dialogue": {
+    "start": "The board shows everything to everyone. Nobody can find their train!",
+    "success": "Clean board. Every passenger sees just their line.",
+    "fail": "The board still shows the wrong trains. Check the counts."
+  }
+}

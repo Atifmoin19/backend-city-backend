@@ -34,6 +34,19 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def get_optional_user(
+    session: SessionDep,
+    access_token: Annotated[str | None, Cookie(alias=ACCESS_COOKIE)] = None,
+) -> User | None:
+    try:
+        return await get_current_user(session, access_token)
+    except UnauthorizedError:
+        return None
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
 def require_role(*allowed: Role) -> Callable[[User], Awaitable[User]]:
     """Role guard. Always checks the DB role, never trusts the role claim in the JWT alone."""
 

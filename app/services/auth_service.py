@@ -92,6 +92,8 @@ class AuthService:
             await self.session.commit()
 
     async def _issue(self, user: User) -> IssuedSession:
+        # Every sign-in and token refresh (each ~15 min while active) marks the user active
+        user.last_active_at = datetime.now(UTC)
         raw = generate_opaque_token()
         ttl = timedelta(days=get_settings().refresh_token_ttl_days)
         await self.refresh_tokens.add(user.id, hash_token(raw), datetime.now(UTC) + ttl)

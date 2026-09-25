@@ -1,0 +1,89 @@
+{
+  "track_slug": "python-backend",
+  "track_title": "Python Backend",
+  "levels": [
+    {
+      "slug": "academy",
+      "title": "The Academy",
+      "district_key": "academy",
+      "chapters": [
+        {
+          "slug": "python-survival-kit",
+          "title": "Python survival kit",
+          "topics": [
+            {
+              "slug": "python-for-js",
+              "title": "Python for JavaScript developers"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "signal-tower",
+      "title": "The Signal Tower",
+      "district_key": "signal-tower",
+      "chapters": [
+        {
+          "slug": "how-the-web-works",
+          "title": "How the web works",
+          "topics": [
+            {
+              "slug": "how-requests-travel",
+              "title": "How a request travels",
+              "practice": [
+                "signal-codes",
+                "method-lanes"
+              ],
+              "checkpoint": "tower-relay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "router-station",
+      "title": "The Router Station",
+      "district_key": "router-station",
+      "chapters": [
+        {
+          "slug": "routing",
+          "title": "Routing & request handling",
+          "topics": [
+            {
+              "slug": "route-dispatch",
+              "title": "Send every request to the right platform",
+              "practice": [
+                "platform-paths",
+                "query-filters"
+              ],
+              "checkpoint": "route-dispatcher"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "gatehouse",
+      "title": "The Gatehouse",
+      "district_key": "gatehouse",
+      "chapters": [
+        {
+          "slug": "request-validation",
+          "title": "Request validation",
+          "topics": [
+            {
+              "slug": "validate-signups",
+              "title": "Validate what comes through the gate",
+              "checkpoint": "signup-gate",
+              "practice": [
+                "ticket-booth",
+                "badge-check"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "slug": "platform-paths",
+  "game_type": "route_dispatcher",
+  "title": "Platform Paths",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "Trains ask the station for their platform at /{{resource}}/<number>, but the route only listens on /{{resource}}, so every train gets lost.",
+    "goal": "Fix the route so the train number is part of the path and arrives as a number."
+  },
+  "objective": "Each train reaches /{{resource}}/<number> and learns its platform.",
+  "rules": [
+    "`GET /{{resource}}/{{train_a}}` answers with that train's platform.",
+    "The train number is an `int`: `/{{resource}}/abc` bounces with 422.",
+    "A train the station doesn't know gets 404 (the helper already does this)."
+  ],
+  "variant_params": {
+    "resource": [
+      "trains",
+      "trams"
+    ],
+    "train_a": [
+      101,
+      204,
+      350
+    ],
+    "train_b": [
+      412,
+      520
+    ],
+    "platform_a": [
+      1,
+      2,
+      3
+    ],
+    "platform_b": [
+      4,
+      5,
+      6
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, HTTPException\n\napp = FastAPI()\n\nPLATFORMS: dict[int, int] = {}\nPLATFORMS[{{train_a}}] = {{platform_a}}\nPLATFORMS[{{train_b}}] = {{platform_b}}\n\n\ndef platform_for(train_id: int) -> dict[str, int]:\n    if train_id not in PLATFORMS:\n        raise HTTPException(status_code=404, detail=\"No such train\")\n    return {\"train\": train_id, \"platform\": PLATFORMS[train_id]}\n\n\n# >>> EDIT START\n@app.get(\"/{{resource}}\")\nasync def find_platform(train_id):\n    return platform_for(train_id)\n# <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Train {{train_a}}",
+      "request": {
+        "method": "GET",
+        "path": "/{{resource}}/{{train_a}}"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "platform": "{{platform_a}}"
+      }
+    },
+    {
+      "name": "Train {{train_b}}",
+      "request": {
+        "method": "GET",
+        "path": "/{{resource}}/{{train_b}}"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "platform": "{{platform_b}}"
+      }
+    },
+    {
+      "name": "Unknown train",
+      "request": {
+        "method": "GET",
+        "path": "/{{resource}}/999"
+      },
+      "expect_status": 404
+    },
+    {
+      "name": "Not a number",
+      "request": {
+        "method": "GET",
+        "path": "/{{resource}}/abc"
+      },
+      "expect_status": 422
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "@app.get(\"/{{resource}}/{train_id}\")\nasync def find_platform(train_id: int) -> dict[str, int]:\n    return platform_for(train_id)\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "The number is in the path itself, not after a question mark. How does a route name a piece of its path?"
+    },
+    {
+      "tier": 2,
+      "text": "Curly braces in the path capture it: \"/{{resource}}/{train_id}\". The parameter's type hint decides what's accepted."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: @app.get(\"/{{resource}}/{train_id}\") with train_id: int."
+    }
+  ],
+  "dialogue": {
+    "start": "Trains everywhere and nobody knows their platform!",
+    "success": "Every train found its platform. Smooth departures.",
+    "fail": "Some trains are still lost. Check the path and the type."
+  }
+}

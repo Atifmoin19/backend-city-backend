@@ -1,14 +1,18 @@
 """Learner-facing game schemas. SECURITY: no hidden tests, no reference solution here."""
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from app.core.security import AttemptMode
 
 
 class PublicTest(BaseModel):
     name: str
     request: dict[str, Any]
     expect_status: int
+    expect_body: Any = None  # subset the response JSON must contain; None = status only
 
 
 class Hint(BaseModel):
@@ -18,6 +22,9 @@ class Hint(BaseModel):
 
 class GameVariantPublic(BaseModel):
     slug: str
+    mode: AttemptMode
+    version: int
+    topic: str
     game_type: str
     title: str
     district: str
@@ -62,7 +69,10 @@ class Violation(BaseModel):
 
 class GradeResponse(BaseModel):
     verdict: str  # "graded" | "rejected" | "load_error" | "timeout" | "crashed"
-    score: int
+    score: int  # after the hint penalty
+    raw_score: int = 0  # share of requests answered correctly
+    hints_used: int = 0
+    hint_penalty: int = 0
     passed: bool
     stars: int
     pass_threshold: int
@@ -71,3 +81,4 @@ class GradeResponse(BaseModel):
     hidden_total: int = 0
     violations: list[Violation] = []
     error: str | None = None
+    retry_at: datetime | None = None  # retest cooldown after a failed attempt, if configured

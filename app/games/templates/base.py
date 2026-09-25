@@ -1,10 +1,20 @@
 from typing import Any, Protocol
 
-from app.games.content import GameContent
-from app.games.variants import Variant
+from app.games.content import GameBody
+from app.games.variants import Variant, render_json
 
 
-class GameTemplate(Protocol):
-    """Server-only logic per game type. Hidden tests are generated here, never shipped."""
+class HiddenTestGenerator(Protocol):
+    """Server-only logic that builds a variant's hidden tests. Never shipped."""
 
-    def hidden_tests(self, game: GameContent, variant: Variant) -> list[dict[str, Any]]: ...
+    def hidden_tests(self, game: GameBody, variant: Variant) -> list[dict[str, Any]]: ...
+
+
+class TemplatedTests:
+    """Default: `hidden_tests.tests` from the content, with the variant's placeholders filled."""
+
+    def hidden_tests(self, game: GameBody, variant: Variant) -> list[dict[str, Any]]:
+        tests: list[dict[str, Any]] = render_json(
+            game.hidden_tests.get("tests", []), variant.params
+        )
+        return tests

@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import models  # noqa: F401
 from app.db.base import Base
 from app.db.session import SessionFactory, engine
+from app.games.seed import sync
 from app.main import create_app
 
 
@@ -44,6 +45,9 @@ async def _schema() -> AsyncIterator[None]:
 
 @pytest.fixture(autouse=True)
 async def _clean_tables() -> AsyncIterator[None]:
+    """Every test starts with the seed content and no users; everything is wiped after."""
+    async with SessionFactory() as session:
+        await sync(session)
     yield
     tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
     async with engine.begin() as conn:
@@ -61,3 +65,13 @@ async def client() -> AsyncIterator[AsyncClient]:
     app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+async def register(client: AsyncClient, email: str = "learner@example.com") -> dict[str, object]:
+    res = await client.post(
+        "/auth/register",
+        json={"email": email, "password": "learner-pass-1", "display_name": "Learner"},
+    )
+    assert res.status_code == 201, res.text
+    user: dict[str, object] = res.json()["user"]
+    return user

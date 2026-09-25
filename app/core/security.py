@@ -3,8 +3,9 @@
 import hashlib
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import jwt
 from argon2 import PasswordHasher
@@ -69,27 +70,49 @@ def hash_token(raw: str) -> str:
 
 ATTEMPT_TOKEN_TTL = timedelta(hours=2)
 
+AttemptMode = Literal["practice", "checkpoint"]
 
-def create_attempt_token(game_slug: str, seed: int) -> str:
-    """Signed (seed, game) pair so the client cannot pick a favorable variant at submit time."""
+
+@dataclass(frozen=True)
+class AttemptClaims:
+    game: str
+    seed: int
+    version_id: uuid.UUID  # the attempt keeps this version even if a newer one is published
+    mode: AttemptMode
+
+
+def create_attempt_token(
+    game_slug: str, seed: int, version_id: uuid.UUID, mode: AttemptMode = "practice"
+) -> str:
+    """Signed variant claims so the client cannot pick a favorable seed, version or mode."""
     settings = get_settings()
     payload = {
         "type": "attempt",
         "game": game_slug,
         "seed": seed,
+        "ver": str(version_id),
+        "mode": mode,
         "exp": datetime.now(UTC) + ATTEMPT_TOKEN_TTL,
     }
     return jwt.encode(payload, settings.jwt_secret.get_secret_value(), settings.jwt_algorithm)
 
 
-def decode_attempt_token(token: str) -> tuple[str, int] | None:
+def decode_attempt_token(token: str) -> AttemptClaims | None:
     settings = get_settings()
     try:
         payload = jwt.decode(
             token, settings.jwt_secret.get_secret_value(), algorithms=[settings.jwt_algorithm]
         )
-    except jwt.PyJWTError:
-        return None
-    if payload.get("type") != "attempt":
-        return None
-    return str(payload["game"]), int(payload["seed"])
+        if payload.get("type") != "attempt" or payload.get("mode") not in (
+            "practice",
+            "checkpoint",
+        ):
+            return None
+        return AttemptClaims(
+            game=str(payload["game"]),
+            seed=int(payload["seed"]),
+            version_id=uuid.UUID(str(payload["ver"])),
+            mode=payload["mode"],
+        )
+    except (jwt.PyJWTError, KeyError, ValueError):
+        return None  # includes tokens issued before versions/modes existed

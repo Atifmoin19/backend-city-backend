@@ -2,11 +2,8 @@
   "slug": "signup-gate",
   "game_type": "bouncer",
   "title": "Guard the Signup Gate",
-  "district": "gatehouse",
   "character": "bouncer",
   "visualizer": "request_flow",
-  "is_checkpoint": true,
-  "pass_threshold": 70,
   "scenario": {
     "intro": "Glitch is flooding the gate with fake signups! Only real recruits get through.",
     "goal": "Add validation to SignupRequest: `{{field_name}}` must be {{name_min}}–{{name_max}} characters and `{{age_field}}` must be between {{min_age}} and {{max_age}} (inclusive). Bad requests should bounce with 422."
@@ -18,29 +15,98 @@
     "Anything that breaks a rule bounces with 422."
   ],
   "variant_params": {
-    "field_name": ["username", "handle", "nickname"],
-    "name_min": [3, 4],
-    "name_max": [12, 16, 20],
-    "age_field": ["age", "user_age"],
-    "min_age": [13, 16, 18],
-    "max_age": [99, 120]
+    "field_name": [
+      "username",
+      "handle",
+      "nickname"
+    ],
+    "name_min": [
+      3,
+      4
+    ],
+    "name_max": [
+      12,
+      16,
+      20
+    ],
+    "age_field": [
+      "age",
+      "user_age"
+    ],
+    "min_age": [
+      13,
+      16,
+      18
+    ],
+    "max_age": [
+      99,
+      120
+    ]
   },
   "starter_code": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\n\nclass SignupRequest(BaseModel):\n    # >>> EDIT START\n    {{field_name}}: str\n    {{age_field}}: int\n    # <<< EDIT END\n\n\n@app.post(\"/signup\", status_code=201)\nasync def signup(body: SignupRequest) -> dict[str, str]:\n    return {\"welcome\": body.{{field_name}}}\n",
-  "editable_region": { "start_marker": "# >>> EDIT START", "end_marker": "# <<< EDIT END" },
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
   "public_tests": [
-    { "name": "Real recruit", "request": { "method": "POST", "path": "/signup", "json": { "{{field_name}}": "neo_runner", "{{age_field}}": 25 } }, "expect_status": 201 },
-    { "name": "Too young", "request": { "method": "POST", "path": "/signup", "json": { "{{field_name}}": "tiny_tim", "{{age_field}}": 5 } }, "expect_status": 422 },
-    { "name": "Name too short", "request": { "method": "POST", "path": "/signup", "json": { "{{field_name}}": "x", "{{age_field}}": 30 } }, "expect_status": 422 }
+    {
+      "name": "Real recruit",
+      "request": {
+        "method": "POST",
+        "path": "/signup",
+        "json": {
+          "{{field_name}}": "neo_runner",
+          "{{age_field}}": 25
+        }
+      },
+      "expect_status": 201
+    },
+    {
+      "name": "Too young",
+      "request": {
+        "method": "POST",
+        "path": "/signup",
+        "json": {
+          "{{field_name}}": "tiny_tim",
+          "{{age_field}}": 5
+        }
+      },
+      "expect_status": 422
+    },
+    {
+      "name": "Name too short",
+      "request": {
+        "method": "POST",
+        "path": "/signup",
+        "json": {
+          "{{field_name}}": "x",
+          "{{age_field}}": 30
+        }
+      },
+      "expect_status": 422
+    }
   ],
   "reference_solution": "{{field_name}}: str = Field(min_length={{name_min}}, max_length={{name_max}})\n{{age_field}}: int = Field(ge={{min_age}}, le={{max_age}})\n",
   "hints": [
-    { "tier": 1, "text": "Right now every field accepts anything. What should happen when {{age_field}} is 5?" },
-    { "tier": 2, "text": "Pydantic's Field() takes limits: ge=/le= for numbers, min_length=/max_length= for strings." },
-    { "tier": 3, "text": "Something like: {{age_field}}: int = Field(ge=..., le=...)" }
+    {
+      "tier": 1,
+      "text": "Right now every field accepts anything. What should happen when {{age_field}} is 5?"
+    },
+    {
+      "tier": 2,
+      "text": "Pydantic's Field() takes limits: ge=/le= for numbers, min_length=/max_length= for strings."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: {{age_field}}: int = Field(ge=..., le=...)"
+    }
   ],
   "dialogue": {
     "start": "Nobody gets in without the right papers!",
     "success": "Clean gate! Glitch's fakes bounced right off.",
     "fail": "Uh-oh, some fakes slipped through. Check which packets got in."
+  },
+  "hidden_tests": {
+    "generator": "signup_boundaries"
   }
 }

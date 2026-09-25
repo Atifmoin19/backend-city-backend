@@ -1,6 +1,7 @@
 import pytest
 
-from harness.runner import run
+from harness.asgi import SimRequest
+from harness.runner import contains, run
 from harness.splice import SpliceError, splice
 
 REGION = {"start_marker": "# >>> EDIT START", "end_marker": "# <<< EDIT END"}
@@ -62,3 +63,33 @@ async def test_runner_reports_load_error() -> None:
     report = await run("app = undefined_name", [])
     assert not report["ok"]
     assert "NameError" in (report["error"] or "")
+
+
+ROUTES = """
+from fastapi import FastAPI
+app = FastAPI()
+@app.get("/trains/{train_id}")
+async def train(train_id: int) -> dict[str, object]:
+    return {"id": train_id, "line": "red", "stops": [1, 2]}
+"""
+
+
+def test_contains_is_a_recursive_subset_match() -> None:
+    assert contains({"a": 1, "b": {"c": 2, "d": 3}}, {"b": {"c": 2}})
+    assert not contains({"a": 1}, {"a": 2})
+    assert not contains({"a": 1}, {"z": 1})
+    assert not contains([1, 2], {"a": 1})
+    assert contains([1, 2], [1, 2])
+
+
+async def test_expect_body_checks_which_handler_answered() -> None:
+    req: SimRequest = {"method": "GET", "path": "/trains/7"}
+    report = await run(
+        ROUTES,
+        [
+            {"name": "right", "request": req, "expect_status": 200, "expect_body": {"id": 7}},
+            {"name": "wrong", "request": req, "expect_status": 200, "expect_body": {"id": 8}},
+            {"name": "status only", "request": req, "expect_status": 200, "expect_body": None},
+        ],
+    )
+    assert [r["passed"] for r in report["results"]] == [True, False, True]

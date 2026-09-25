@@ -20,10 +20,10 @@ cookies, error envelope, rate limiting.
 | `app/main.py` | App factory: middleware, error handlers, limiter, routers |
 | `app/api/router.py` | The only place routers are registered |
 | `app/db/` | Declarative base (naming conventions, mixins), async engine/session |
-| `app/games/` | Server-only game engine: content loader, variant seeding, per-type templates |
+| `app/games/` | Server-only game engine: content schemas, DB catalog, seed sync, variants, hidden-test generators, validation |
 | `app/sandbox/` | Checkpoint execution sandbox |
 | `harness/` | Shared runtime (browser + sandbox) |
-| `content/seed/` | Seed content JSON |
+| `content/seed/` | Seed content: `curriculum.json` (tracks → topics → games) + `games/*.json` |
 | `alembic/` | Migrations |
 
 ## Auth flow
@@ -38,20 +38,21 @@ cookies, error envelope, rate limiting.
 
 ## Game + grading flow (Bouncer prototype)
 ```
-GET /games/{slug}/variant  ──► random or given seed → pick variant params
+GET /games/{slug}/variant  ──► live game_version from the DB, random or given seed
                                render scenario/starter/public tests
-                               sign attempt_token = JWT{game, seed, exp}
+                               sign attempt_token = JWT{game, seed, version, mode, exp}
                                (no hidden tests, no solution, no hint text)
 
 Browser: practice runs in Pyodide using harness/ + public tests (no server needed)
 
-POST /games/{slug}/grade {attempt_token, snippet}   (login required, rate limited)
-   1. verify token → seed (client can't pick an easy variant)
-   2. AST policy check on snippet (allowlist imports, no dunders/eval/open…)
-   3. splice snippet into rendered starter code
-   4. public tests + template.hidden_tests(seed)  ← generated server-side only
-   5. sandbox subprocess → RunReport
-   6. score = % of all tests passed by status code; stars; hidden results aggregated only
+POST /games/{slug}/grade {attempt_token, snippet}   (login required, rate limited per user)
+   1. verify token → version + seed (client can't pick an easy variant); checkpoint mode only
+   2. retest cooldown check; hints used on this variant (from the open attempt)
+   3. AST policy check on snippet (allowlist imports, no dunders/eval/open…)
+   4. splice snippet into rendered starter code
+   5. public tests + hidden tests (templated list or a named generator) ← server-side only
+   6. sandbox gets the REQUESTS only → statuses + bodies; the API decides pass/fail
+   7. score = % passed − 5 per hint tier; stars; attempt + topic_progress saved
 ```
 
 ### Sandbox layers (defense in depth)
@@ -62,6 +63,21 @@ POST /games/{slug}/grade {attempt_token, snippet}   (login required, rate limite
 | Resources | `setrlimit`: CPU, address space (Linux only), FSIZE=0, NOFILE=64; wall-clock timeout + kill |
 | Runtime | `sys.addaudithook` after imports: blocks socket/subprocess/os.exec*/file-write events |
 | Output | stdout captured from learner code; result JSON size-capped |
+| Scoring | children never see expected results; the API scores their raw statuses/bodies |
+| Descriptors | warm children get /dev/null for 0-2 and only their own result pipe |
+
+**Why scoring moved out of the sandbox (2026-09-26):** allowed modules expose `os`
+(`uuid.os`, `dataclasses.sys`), so learner code could write a forged "all passed" report to
+stdout and `_exit(0)`. With expectations kept in the API, a forged report can only claim
+statuses, which is the same as solving the game. `tests/test_sandbox.py` keeps that attack.
+
+### Warm sandbox (fork server)
+`entry.py --serve` imports FastAPI/Pydantic once, then forks one child per job; the child
+drops to its own session, rlimits (CPU, FSIZE=0, NOFILE, address space on top of what it
+inherited), audit hook and timer, runs, and writes its report to a private pipe. The server
+kills it after timeout + 1 s. The API talks to the server over stdin/stdout, one job at a time,
+restarts it on any failure, and falls back to a cold interpreter if it can't start. Measured
+in Docker at `--cpus=0.1`: 11 s cold → ~0.7 s warm. Started at app startup (lifespan).
 
 Known limit: no kernel-level network namespace on Render free tier. Audit hook + allowlist cover
 it for now; if abuse appears, move grading to an isolated worker (ideology §11.3).
@@ -74,8 +90,10 @@ it for now; if abuse appears, move grading to an isolated worker (ideology §11.
   `harness/requirements.txt` so grading matches the browser exactly.
 - **Two repos, harness lives here**: the sandbox is its primary consumer; the frontend syncs a
   pinned copy (see frontend `scripts/sync-harness.mjs`).
-- **File-based content for Phase 0**: `content/seed/games/*.json`. The loader interface
-  (`get_game`) will switch to `game_versions` rows without touching services.
-- **Hints on demand**: `hint_tiers` only in payload; text from `POST /games/{slug}/hint`, so usage
-  can be counted toward the score penalty once attempts are persisted.
+- **Content lives in the DB** (`games` + immutable `game_versions`), seeded from
+  `content/seed/`. Admins save drafts and publish; attempts pin their version.
+- **Tracks are cities**: everything (auth, progress, admin, grading) is per track, so another
+  city (e.g. a frontend track) is new content plus, if needed, a new code runner.
+- **Hints on demand**: `hint_tiers` only in payload; text from `POST /games/{slug}/hint`; on a
+  checkpoint each tier is recorded on the attempt and costs 5 points.
 - **In-memory rate limits**: fine for one instance; switch slowapi storage to Redis to scale out.

@@ -1,0 +1,227 @@
+{
+  "slug": "tower-relay",
+  "game_type": "status_codes",
+  "title": "Tower Relay",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The relay desk handles {{thing}}s for pilots across the city. It needs the right lanes and the right answers, including for visitors with no pilot badge and pilots who aren't allowed.",
+    "goal": "Set the three methods and six status codes so every request gets the truth."
+  },
+  "objective": "Right lane, right answer: for pilots, strangers, and anyone who isn't allowed.",
+  "rules": [
+    "Tracking a {{thing}} reads it; sending creates one; cancelling removes it.",
+    "Found answers 2xx with data; created answers the code for \"new thing\"; a {{thing}} that doesn't exist answers 404.",
+    "Sending without a `to` address: valid JSON, but the data breaks the rules.",
+    "No `X-Pilot` header: we don't know who you are. A pilot who isn't a {{rank}} trying to cancel: we know, and the answer is no."
+  ],
+  "variant_params": {
+    "thing": [
+      "parcel",
+      "letter",
+      "crate"
+    ],
+    "item_id": [
+      7,
+      12,
+      31
+    ],
+    "rank": [
+      "captain",
+      "chief",
+      "warden"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, Request, Response\nfrom fastapi.responses import JSONResponse\n\napp = FastAPI()\n\nSTORE: dict[int, str] = {}\nSTORE[{{item_id}}] = \"in the tower\"\n\n# >>> EDIT START\n# Methods\nREAD = \"GET\"\nSEND = \"GET\"\nCANCEL = \"GET\"\n# Status codes\nFOUND = 500\nCREATED = 500\nMISSING = 500\nBAD_DATA = 500\nNOT_LOGGED_IN = 500\nNOT_ALLOWED = 500\n# <<< EDIT END\n\n\ndef signal(code: int, **body: object) -> JSONResponse:\n    return JSONResponse(status_code=code, content=body)\n\n\ndef pilot(request: Request) -> str | None:\n    return request.headers.get(\"x-pilot\")\n\n\nasync def read(item_id: int, request: Request) -> Response:\n    if not pilot(request):\n        return signal(NOT_LOGGED_IN, error=\"who are you?\")\n    if item_id not in STORE:\n        return signal(MISSING, error=\"no such {{thing}}\")\n    return signal(FOUND, id=item_id, status=STORE[item_id])\n\n\nasync def send(request: Request) -> Response:\n    if not pilot(request):\n        return signal(NOT_LOGGED_IN, error=\"who are you?\")\n    body = await request.json() if await request.body() else {}\n    to = body.get(\"to\") if isinstance(body, dict) else None\n    if not isinstance(to, str) or not to:\n        return signal(BAD_DATA, error=\"`to` is required\")\n    return signal(CREATED, id=99, to=to)\n\n\nasync def cancel(item_id: int, request: Request) -> Response:\n    if not pilot(request):\n        return signal(NOT_LOGGED_IN, error=\"who are you?\")\n    if request.headers.get(\"x-rank\") != \"{{rank}}\":\n        return signal(NOT_ALLOWED, error=\"only a {{rank}} can cancel\")\n    if item_id not in STORE:\n        return signal(MISSING, error=\"no such {{thing}}\")\n    return Response(status_code=204)\n\n\napp.add_api_route(\"/{{thing}}s/{item_id}\", read, methods=[READ])\napp.add_api_route(\"/{{thing}}s\", send, methods=[SEND])\napp.add_api_route(\"/{{thing}}s/{item_id}\", cancel, methods=[CANCEL])\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Track a {{thing}}",
+      "request": {
+        "method": "GET",
+        "path": "/{{thing}}s/{{item_id}}",
+        "headers": {
+          "X-Pilot": "neo"
+        }
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "id": "{{item_id}}"
+      }
+    },
+    {
+      "name": "Send a {{thing}}",
+      "request": {
+        "method": "POST",
+        "path": "/{{thing}}s",
+        "json": {
+          "to": "Zion"
+        },
+        "headers": {
+          "X-Pilot": "neo"
+        }
+      },
+      "expect_status": 201
+    },
+    {
+      "name": "Unknown {{thing}}",
+      "request": {
+        "method": "GET",
+        "path": "/{{thing}}s/999",
+        "headers": {
+          "X-Pilot": "neo"
+        }
+      },
+      "expect_status": 404
+    },
+    {
+      "name": "No pilot badge",
+      "request": {
+        "method": "GET",
+        "path": "/{{thing}}s/{{item_id}}"
+      },
+      "expect_status": 401
+    }
+  ],
+  "hidden_tests": {
+    "tests": [
+      {
+        "name": "{{rank}} cancels",
+        "request": {
+          "method": "DELETE",
+          "path": "/{{thing}}s/{{item_id}}",
+          "headers": {
+            "X-Pilot": "neo",
+            "X-Rank": "{{rank}}"
+          }
+        },
+        "expect_status": 204
+      },
+      {
+        "name": "cadet cancels",
+        "request": {
+          "method": "DELETE",
+          "path": "/{{thing}}s/{{item_id}}",
+          "headers": {
+            "X-Pilot": "neo",
+            "X-Rank": "cadet"
+          }
+        },
+        "expect_status": 403
+      },
+      {
+        "name": "cancel without badge",
+        "request": {
+          "method": "DELETE",
+          "path": "/{{thing}}s/{{item_id}}"
+        },
+        "expect_status": 401
+      },
+      {
+        "name": "{{rank}} cancels a missing {{thing}}",
+        "request": {
+          "method": "DELETE",
+          "path": "/{{thing}}s/999",
+          "headers": {
+            "X-Pilot": "neo",
+            "X-Rank": "{{rank}}"
+          }
+        },
+        "expect_status": 404
+      },
+      {
+        "name": "send with no address",
+        "request": {
+          "method": "POST",
+          "path": "/{{thing}}s",
+          "json": {},
+          "headers": {
+            "X-Pilot": "neo"
+          }
+        },
+        "expect_status": 422
+      },
+      {
+        "name": "send with an empty address",
+        "request": {
+          "method": "POST",
+          "path": "/{{thing}}s",
+          "json": {
+            "to": ""
+          },
+          "headers": {
+            "X-Pilot": "neo"
+          }
+        },
+        "expect_status": 422
+      },
+      {
+        "name": "send without badge",
+        "request": {
+          "method": "POST",
+          "path": "/{{thing}}s",
+          "json": {
+            "to": "Zion"
+          }
+        },
+        "expect_status": 401
+      },
+      {
+        "name": "replace with PUT",
+        "request": {
+          "method": "PUT",
+          "path": "/{{thing}}s/{{item_id}}",
+          "headers": {
+            "X-Pilot": "neo"
+          }
+        },
+        "expect_status": 405
+      },
+      {
+        "name": "POST to one {{thing}}",
+        "request": {
+          "method": "POST",
+          "path": "/{{thing}}s/{{item_id}}",
+          "headers": {
+            "X-Pilot": "neo"
+          }
+        },
+        "expect_status": 405
+      },
+      {
+        "name": "GET the whole desk",
+        "request": {
+          "method": "GET",
+          "path": "/{{thing}}s",
+          "headers": {
+            "X-Pilot": "neo"
+          }
+        },
+        "expect_status": 405
+      }
+    ]
+  },
+  "reference_solution": "READ = \"GET\"\nSEND = \"POST\"\nCANCEL = \"DELETE\"\nFOUND = 200\nCREATED = 201\nMISSING = 404\nBAD_DATA = 422\nNOT_LOGGED_IN = 401\nNOT_ALLOWED = 403\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Two codes are about the visitor: one means \"who are you?\", the other \"I know you, and no\"."
+    },
+    {
+      "tier": 2,
+      "text": "Valid JSON that breaks the rules is 422, not 400. Sending needs the method that creates things."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: NOT_LOGGED_IN = 401, NOT_ALLOWED = 403, CANCEL = \"DELETE\"."
+    }
+  ],
+  "dialogue": {
+    "start": "Relay desk is open. Every pilot, stranger and cadet gets a true answer.",
+    "success": "Relay holds! Every request got the right lane and the right code.",
+    "fail": "Some answers were wrong. Think about who is asking and what they wanted."
+  }
+}

@@ -13,16 +13,18 @@ if a change contradicts it, raise it with the owner first.
 - `app/api/routes/` thin routers → `app/services/` business logic → `app/repositories/` data access → `app/models/`
 - `app/core/` config, security, cookies, deps (auth/role guards), errors, rate limits
 - `app/schemas/` Pydantic request/response models (learner-safe only)
-- `app/games/` SERVER-ONLY game logic: content loader, seeded variants, templates (hidden tests)
-- `app/sandbox/` policy (AST allowlist), entry (child process), executor (subprocess + rlimits)
+- `app/games/` SERVER-ONLY game logic: content schemas, DB catalog, seed sync, variants, hidden-test generators, validation
+- `app/sandbox/` policy (AST allowlist), entry (cold child / warm fork server), executor (runs + scores in the API)
 - `harness/` SHARED with frontend Pyodide — public code, pure Python, no app imports
-- `content/seed/games/*.json` game content (Phase 0; moves to DB `game_versions`)
+- `content/seed/` curriculum + game JSON, synced to the DB by `python -m app.games.seed` (admins own published versions afterwards)
 
 ## Rules
 - No business logic in routers. Services own commits.
 - Full type hints; mypy strict must pass. Ruff clean.
 - Every admin route depends on `AdminUser`/`SuperAdminUser` (server-side role check).
-- Hidden tests, reference solutions and hint text never go in public payloads. Tests assert this.
+- Hidden tests, reference solutions and hint text never go in public payloads (admin routes excepted). Tests assert this.
+- The sandbox never decides pass/fail: send it requests only and score in `executor.score`.
+- New game content must pass `tests/test_content.py` (reference 100%, starter below the pass mark).
 - Nothing secret or answer-related in `harness/` — it is shipped to browsers.
 - `harness/requirements.txt` must match the Pyodide release the frontend uses.
 - Errors: raise `AppError` subclasses → `{"error": {"code", "message"}}`.

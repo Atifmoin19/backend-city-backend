@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
 from app.models.enums import Role
 
@@ -41,6 +42,13 @@ class UserPublic(BaseModel):
     display_name: str
     role: Role
     is_verified: bool
+    onboarded_at: datetime | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def onboarded(self) -> bool:
+        """Finished the first-run orientation (so login can skip /welcome)."""
+        return self.onboarded_at is not None
 
 
 class AuthResponse(BaseModel):

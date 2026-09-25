@@ -65,15 +65,25 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     auth_rate_limit: str = "10/minute"
     checkpoint_rate_limit: str = "20/minute"
+    # Shared with the frontend proxy (PROXY_SHARED_SECRET on Vercel). When a request carries
+    # it, its X-BC-Client-IP header is the learner's real IP; every request otherwise looks
+    # like it came from Vercel, so all learners would share one rate-limit bucket.
+    proxy_shared_secret: SecretStr | None = None
 
     # CORS — only needed for direct calls; production uses same-origin rewrites
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    # Scoring: each hint tier used lowers the checkpoint's maximum score by this many points
+    hint_penalty_per_tier: int = 5
 
     # Sandbox
     sandbox_timeout_seconds: float = 4.0  # learner code only
     sandbox_startup_seconds: float = 20.0  # interpreter + imports allowance (slow CPUs)
     sandbox_memory_limit_mb: int = 256
     sandbox_max_snippet_chars: int = 4000
+    # Keep a pre-imported fork server running so a grade doesn't pay interpreter start +
+    # FastAPI imports (7-11 s on Render's 0.1 CPU). Falls back to cold runs if it can't start.
+    sandbox_warm: bool = True
     # Interpreter for the grading sandbox (venv built from harness/requirements.txt).
     # Empty = current interpreter (fine for local dev/tests).
     sandbox_python: str = ""
