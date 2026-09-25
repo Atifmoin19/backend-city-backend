@@ -31,8 +31,11 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 14
     cookie_secure: bool = True
     cookie_domain: str | None = None
+    # Browser-visible path: frontend rewrites /api/* -> backend, so refresh is under /api/auth
+    refresh_cookie_path: str = "/api/auth"
 
     # Rate limits (slowapi syntax)
+    rate_limit_enabled: bool = True
     auth_rate_limit: str = "10/minute"
     checkpoint_rate_limit: str = "20/minute"
 
