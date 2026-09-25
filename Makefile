@@ -1,5 +1,7 @@
-.PHONY: up down logs install lint format typecheck test test-docker check migrate migration
+.PHONY: dev up down logs install lint format typecheck test test-docker check migrate migration
 
+dev:           ## Postgres in Docker + uvicorn --reload in this terminal
+	./scripts/dev.sh
 up:            ## Start Postgres + API (hot reload) in Docker
 	docker compose up -d --build
 down:

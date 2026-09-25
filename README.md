@@ -10,7 +10,16 @@ Frontend repo: `backend-city-frontend` · Product spec: [docs/PROJECT_IDEOLOGY.m
 Python 3.13 · FastAPI 0.141 · Pydantic 2.13 · SQLAlchemy 2.1 (async) + asyncpg · Alembic 1.20 ·
 argon2-cffi · PyJWT · slowapi · pytest · Ruff · mypy (strict) · uv · Docker.
 
-## Run locally (Docker — the default)
+## Quick start (your terminal, live logs + auto-reload)
+Docker Desktop open, then:
+```bash
+./scripts/dev.sh              # Postgres in Docker + uvicorn --reload on http://localhost:8000
+PORT=8010 ./scripts/dev.sh    # another port
+./scripts/dev.sh --docker     # everything in Docker, logs attached
+```
+Ctrl+C stops the API; `docker compose down` stops Postgres.
+
+## Run fully in Docker (detached)
 ```bash
 cp .env.example .env          # then set JWT_SECRET
 make up                       # Postgres 17 (host :5452) + API with hot reload (:8000)

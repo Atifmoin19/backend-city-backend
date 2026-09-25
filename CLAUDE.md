@@ -5,7 +5,7 @@ Source of truth: [docs/PROJECT_IDEOLOGY.md](docs/PROJECT_IDEOLOGY.md). Read it b
 if a change contradicts it, raise it with the owner first.
 
 ## Commands
-- `make up` (Docker: db :5452, api :8000) · `make check` · `make test-docker` · `make format`
+- `./scripts/dev.sh` (db in Docker, uvicorn --reload :8000) · `make up` (all Docker) · `make check` · `make test-docker` · `make format`
 - `make migration m="..."` then review the generated file (autogenerate misses enum drops, FK cycles)
 - Never `git push` unless the owner asks. Conventional commits (feat:, fix:, chore:, docs:).
 
