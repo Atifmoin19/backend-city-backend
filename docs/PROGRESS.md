@@ -2,6 +2,20 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
+## 2026-09-25 — Session 1b: clearer missions
+
+### Done
+- Game content gains `objective` (one-sentence win condition) and `rules` (templated, one per
+  requirement); both are rendered per variant and returned by `GET /games/{slug}/variant`.
+  The frontend mission brief shows them. Test: rules are rendered with no `{{` left.
+- `signup-gate`: third rule shortened.
+- 46 tests pass (45 + 1).
+
+### Next up
+- Persist attempts + `topic_progress` on grade and expose a progress API (frontend's next big need).
+- Hint usage → score penalty (needs the persisted attempt).
+- Then deploy: Render (API) + Neon (Postgres), at the owner's call.
+
 ## 2026-09-25 — Session 1: foundation
 
 ### Done
