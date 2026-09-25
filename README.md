@@ -52,9 +52,10 @@ All documented in [.env.example](.env.example); loaded through typed settings in
 | `CORS_ORIGINS` | Only for direct browser calls; prod is same-origin via Next.js rewrites |
 | `SANDBOX_*` | Grading sandbox timeout, memory, snippet size, interpreter |
 
-## Deployment (later, at a milestone)
-Target: **Render** free web service using the `Dockerfile` (reads `$PORT`, runs migrations on
-boot), database on **Neon**. Not deployed yet — local only for now.
+## Deployment
+Live at **https://backend-city-api.onrender.com** (Render free web service from the
+`Dockerfile`: reads `$PORT`, runs `alembic upgrade head` on boot), database on **Neon**
+(Postgres 17). Pushing `main` redeploys. Step-by-step: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Docs
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layers, data flow, decisions
@@ -62,7 +63,3 @@ boot), database on **Neon**. Not deployed yet — local only for now.
 - [docs/DATABASE.md](docs/DATABASE.md) — tables and migrations
 - [docs/PROGRESS.md](docs/PROGRESS.md) — running log
 - [CLAUDE.md](CLAUDE.md) — guide for AI sessions
-
-## Deploy
-
-Neon (Postgres) + Render (this API, Docker) + Vercel (frontend): [docs/DEPLOY.md](docs/DEPLOY.md).

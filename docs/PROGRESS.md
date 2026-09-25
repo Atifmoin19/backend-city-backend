@@ -2,6 +2,22 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
+## 2026-09-26 — Session 1d: hardening
+
+### Done
+- `/openapi.json` hidden in production (docs were already off).
+- Full-history secret scan: only placeholder credentials (`XXXX`, `u:p@ep-x`); `.env` ignored.
+
+### Next up (owner decides; full list in the frontend `docs/PROGRESS.md` status snapshot)
+1. Progress API: persist `attempts` + `topic_progress` on grade, `GET/PUT /me/progress`,
+   hint penalty + retest cooldown.
+2. Email flows: verify email, forgot/reset password.
+3. Admin MVP: content CRUD from `game_versions`, test-run with the reference solution,
+   draft/publish, user list/detail (routes already guarded by `require_role`).
+4. Warm sandbox (pre-imported worker) to cut grading from ~7–11 s to ~1 s on the free CPU;
+   rate limits keyed on the real client IP.
+5. More game templates: Route Dispatcher (Level 1), Status Code Speed Round, Pick the Line.
+
 ## 2026-09-25 — Session 1c: first production deploy
 
 ### Done

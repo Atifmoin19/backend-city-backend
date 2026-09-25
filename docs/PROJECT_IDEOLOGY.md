@@ -792,7 +792,7 @@ venv built from it, so grading behaves exactly like the browser.
 - Pyodide + FastAPI/Pydantic feasibility and load time. **Done 2026-09-25: viable.**
 - Request Flow Visualizer prototype (PixiJS) with one Bouncer game. **Done 2026-09-25.**
 - PGlite query game prototype.
-- Server sandbox prototype on Render free tier. **Prototype done locally in Docker; Render deploy pending.**
+- Server sandbox prototype on Render free tier. **Done 2026-09-26: live on Render; needed a separate startup budget on the 0.1 CPU (grading ~7–11 s).**
 - Decide harness approach (real FastAPI vs mini framework). **Decided: real FastAPI.**
 
 ### Phase 1 — MVP
@@ -802,14 +802,14 @@ venv built from it, so grading behaves exactly like the browser.
 - World map (basic), lesson screen, game screen, result screen.
 - Dark neon theme, mascot with basic states, one district's visual kit.
 - Admin: content CRUD, game builder, test-run, publish, basic user list/detail.
-- Deployment on Vercel + Render + Neon, keep-alive ping.
+- Deployment on Vercel + Render + Neon, keep-alive ping. **Deployed 2026-09-26; keep-alive ping pending.**
 
 ### Phase 2 — Engagement & AI
 - AI tiered hints, failure explainer, concept chat.
 - XP, stars, streaks, badges.
 - Levels 3–4 (Data Vaults, Citadel).
 - Admin analytics (funnel, hardest games), feedback inbox.
-- Sound effects, more characters, performance mode.
+- Sound effects, more characters, performance mode. **Sound + performance mode shipped early (2026-09-25).**
 
 ### Phase 3 — Depth
 - Levels 5–6 (Speedway, Factory).
