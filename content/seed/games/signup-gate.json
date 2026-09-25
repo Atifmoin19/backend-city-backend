@@ -15,7 +15,7 @@
   "rules": [
     "`{{field_name}}` is {{name_min}} to {{name_max}} characters long.",
     "`{{age_field}}` is between {{min_age}} and {{max_age}}, both included.",
-    "Break any rule and the request bounces with 422. FastAPI sends the 422 for you once the model rejects the data."
+    "Anything that breaks a rule bounces with 422."
   ],
   "variant_params": {
     "field_name": ["username", "handle", "nickname"],
