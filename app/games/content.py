@@ -26,6 +26,8 @@ class GameContent(BaseModel):
     is_checkpoint: bool
     pass_threshold: int
     scenario: dict[str, str]
+    objective: str = ""  # one sentence: what winning looks like
+    rules: list[str] = []  # the exact requirements, one per line (templated)
     variant_params: dict[str, list[Any]]
     starter_code: str
     editable_region: EditableRegion

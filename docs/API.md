@@ -44,6 +44,8 @@ Public, no auth. Random seed if omitted.
   "slug": "signup-gate", "game_type": "bouncer", "title": "...", "district": "gatehouse",
   "character": "bouncer", "visualizer": "request_flow", "is_checkpoint": true, "pass_threshold": 70,
   "scenario": { "intro": "...", "goal": "..." },
+  "objective": "Real recruits get in (201). Anyone with bad papers bounces (422).",
+  "rules": ["`username` is 3 to 12 characters long.", "..."],
   "starter_code": "...", "editable_region": { "start_marker": "...", "end_marker": "..." },
   "public_tests": [{ "name": "...", "request": { "method": "POST", "path": "/signup", "json": {} }, "expect_status": 201 }],
   "hint_tiers": [1, 2, 3], "dialogue": { "start": "...", "success": "...", "fail": "..." },

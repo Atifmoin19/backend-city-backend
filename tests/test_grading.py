@@ -81,6 +81,16 @@ async def test_variant_endpoint_never_leaks_server_only_fields(client: AsyncClie
     assert res.json()["hint_tiers"] == [1, 2, 3]
 
 
+async def test_variant_ships_rendered_objective_and_rules(client: AsyncClient) -> None:
+    body = (await client.get(f"/games/{SLUG}/variant", params={"seed": 7})).json()
+    params = pick_params(get_game(SLUG), 7).params  # type: ignore[arg-type]
+    assert body["objective"]
+    assert len(body["rules"]) == 3
+    assert all("{{" not in r for r in body["rules"])
+    assert f"`{params['field_name']}`" in body["rules"][0]
+    assert str(params["max_age"]) in body["rules"][1]
+
+
 async def test_hint_endpoint_renders_variant(client: AsyncClient) -> None:
     variant = (await client.get(f"/games/{SLUG}/variant", params={"seed": 7})).json()
     age_field = pick_params(get_game(SLUG), 7).params["age_field"]  # type: ignore[arg-type]

@@ -26,6 +26,8 @@ class GameVariantPublic(BaseModel):
     is_checkpoint: bool
     pass_threshold: int
     scenario: dict[str, str]
+    objective: str
+    rules: list[str]
     starter_code: str
     editable_region: dict[str, str]
     public_tests: list[PublicTest]

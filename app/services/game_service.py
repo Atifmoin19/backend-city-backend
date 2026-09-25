@@ -31,6 +31,8 @@ def _to_public(game: GameContent, v: Variant) -> GameVariantPublic:
         is_checkpoint=game.is_checkpoint,
         pass_threshold=game.pass_threshold,
         scenario={k: render(t, p) for k, t in game.scenario.items()},
+        objective=render(game.objective, p),
+        rules=[render(r, p) for r in game.rules],
         starter_code=render(game.starter_code, p),
         editable_region=dict(game.editable_region),
         public_tests=render_json(game.public_tests, p),

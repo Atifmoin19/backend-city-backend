@@ -11,6 +11,12 @@
     "intro": "Glitch is flooding the gate with fake signups! Only real recruits get through.",
     "goal": "Add validation to SignupRequest: `{{field_name}}` must be {{name_min}}–{{name_max}} characters and `{{age_field}}` must be between {{min_age}} and {{max_age}} (inclusive). Bad requests should bounce with 422."
   },
+  "objective": "Real recruits get in (201). Anyone with bad papers bounces (422).",
+  "rules": [
+    "`{{field_name}}` is {{name_min}} to {{name_max}} characters long.",
+    "`{{age_field}}` is between {{min_age}} and {{max_age}}, both included.",
+    "Break any rule and the request bounces with 422. FastAPI sends the 422 for you once the model rejects the data."
+  ],
   "variant_params": {
     "field_name": ["username", "handle", "nickname"],
     "name_min": [3, 4],
