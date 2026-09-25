@@ -14,10 +14,23 @@ Running log. Newest entry on top. Update at the end of every task.
 - DB layer: async SQLAlchemy 2.1 + asyncpg; 11 models from ideology §15; Alembic initial migration
   (hand-patched: games↔game_versions FK cycle added after both tables; enum types dropped on downgrade). Upgrade/downgrade roundtrip verified.
 
-### Pending (this session)
-- Auth, role dependency, rate limits
-- Harness + grading sandbox
-- Full docs (API.md, DATABASE.md, ARCHITECTURE.md)
+- Auth: register/login/logout/refresh/me; httpOnly cookies; refresh rotation + reuse detection;
+  `require_role` guard + `/admin/whoami`; slowapi limits; error envelope.
+- Phase 0 spike S1: FastAPI + Pydantic v2 run in Pyodide 314.0.7 (see ARCHITECTURE.md). Decision:
+  real FastAPI, no mini-framework.
+- Harness (`harness/`), sandbox (policy + audit hook + rlimits + scrubbed env), Bouncer template,
+  `/games/{slug}/variant|hint|grade`, signed attempt tokens.
+- Docker image builds pinned sandbox venv (Pyodide parity). 45 tests pass in the Linux container.
+- Docs: README, CLAUDE.md, ARCHITECTURE, API, DATABASE.
+
+### Pending
+- Persist attempts + topic_progress on grade; hint usage → score penalty.
+- Content from DB (`game_versions`) instead of `content/seed` JSON; admin CRUD.
+- Email verify / reset (EmailJS), `lessons` table.
+- Render deploy + Neon (at a milestone; owner decides).
 
 ### Known issues
-- None yet.
+- `RLIMIT_AS` not enforced on macOS; memory test runs only in Docker/Linux (`make test-docker`).
+- Refresh-cookie path is `/api/auth` (browser path). Direct calls to `:8000/auth/refresh`
+  from a browser won't carry it — always go through the Next.js rewrite.
+- No kernel network isolation for the sandbox (audit hook only) — acceptable for Phase 0.

@@ -3,7 +3,7 @@
 > **Working title:** Backend City (final name not decided yet)
 > **Document purpose:** The single source of truth for this project. It captures the idea, the learning philosophy, the full curriculum, game design, UI/UX direction, admin module, technical stack, architecture, data model, deployment plan, challenges, and roadmap.
 > **Status:** Planning / brainstorming complete, pre-development.
-> **Last updated:** September 2026
+> **Last updated:** 2026-09-25 (two-repo structure, Phase 0 spike results)
 
 ---
 
@@ -446,7 +446,7 @@ Later: analytics, feedback inbox, announcements, audit log, usage monitor.
   - Fake email/webhook endpoints
   - Query counter (for N+1 games)
   - Clock control (for TTL/expiry games)
-- **[VERIFY — Phase 0 spike]:** confirm FastAPI + Pydantic v2 run acceptably in Pyodide (install via `micropip`, test load time). If not viable, fall back to a **lightweight FastAPI-compatible mini framework** written for the harness that mirrors FastAPI's syntax for the concepts taught.
+- **[DECIDED — Phase 0 spike, 2026-09-25]:** real FastAPI + Pydantic v2 run in Pyodide 314.0.7. Measured: core boot ~1.4 s, FastAPI stack load ~0.5 s + import ~0.9 s, in-process request ~0.13 ms; extra download ~2.2 MB gzipped on top of ~6 MB Pyodide core (cached after first visit). No mini-framework needed. Pyodide bundles fastapi 0.136.1 / pydantic 2.12.5, so the server sandbox is pinned to the same versions.
 
 ### 11.3 Grading
 - **Grade by behavior, not string matching** — many correct answers exist.
@@ -550,6 +550,7 @@ Later: analytics, feedback inbox, announcements, audit log, usage monitor.
 - Content from Vercel cache (no backend needed to browse/play).
 - Optimistic, queued saves.
 - Friendly themed "waking up the server" loader as last resort.
+- **[VERIFY]** Vercel external rewrites have a proxy timeout; a 30–60 s Render cold start may exceed it. The frontend API client must retry the first failed call after a cold start.
 
 ---
 
@@ -684,43 +685,51 @@ Later: analytics, feedback inbox, announcements, audit log, usage monitor.
 
 ---
 
-## 18. Repository Structure (proposed)
+## 18. Repository Structure [DECIDED — two repos]
+
+The project uses **two separate git repositories** instead of one monorepo:
+`backend-city-frontend` (Vercel) and `backend-city-backend` (Render). Locally they sit side by side:
 
 ```
-backend-city/
-├── frontend/                 # Next.js app (deployed to Vercel)
-│   ├── app/
-│   │   ├── (marketing)/      # landing page
-│   │   ├── (auth)/           # login, signup, verify, reset
-│   │   ├── (game)/           # map, levels, lessons, games, results
-│   │   ├── profile/ leaderboard/ settings/
-│   │   ├── admin/            # admin panel
-│   │   └── api/revalidate/   # on-demand ISR webhook
-│   ├── components/           # ui/, game/, characters/, visualizer/, editor/, admin/
-│   ├── engine/               # game engine: config loader, harness bridge, scoring
-│   ├── workers/              # pyodide.worker.ts, sql.worker.ts
-│   ├── assets/               # rive/, lottie/, sounds/, district backgrounds
-│   ├── lib/ stores/ styles/
-│   └── next.config.js        # /api/* rewrites to Render
-├── backend/                  # FastAPI app (deployed to Render)
-│   ├── app/
-│   │   ├── api/              # routers: auth, content, attempts, ai, admin
-│   │   ├── core/             # config, security, deps, rate limits
-│   │   ├── models/           # SQLAlchemy models
-│   │   ├── schemas/          # Pydantic schemas
-│   │   ├── services/         # grading, variants, ai, email, progress, analytics
-│   │   ├── sandbox/          # checkpoint execution sandbox
-│   │   └── main.py
-│   ├── alembic/
-│   ├── tests/
-│   └── Dockerfile
-├── harness/                  # shared Python harness (runs in Pyodide AND server sandbox)
-├── content/seed/             # initial level/game JSON for seeding the DB
-└── docs/                     # this document and others
+backend-city/                 # plain folder, NOT a git repo
+├── frontend/                 # repo: backend-city-frontend (Next.js, deployed to Vercel)
+│   ├── src/
+│   │   ├── app/              # routes: (marketing), (auth), (game), admin/, api/revalidate/
+│   │   ├── features/         # feature modules: landing, auth, world-map, game, ...
+│   │   ├── components/       # ui/ (design system), characters/, effects/
+│   │   ├── engine/           # game engine: config types, harness bridge, visualizer, scoring
+│   │   ├── workers/          # pyodide.worker.ts (sql.worker.ts later)
+│   │   ├── stores/ lib/ styles/
+│   ├── public/harness/       # GENERATED copy of backend/harness (git-ignored)
+│   ├── scripts/sync-harness.mjs
+│   ├── harness.lock          # pinned backend commit for CI/Vercel builds
+│   └── next.config.ts        # /api/* rewrites to the backend
+└── backend/                  # repo: backend-city-backend (FastAPI, deployed to Render)
+    ├── app/
+    │   ├── api/routes/       # thin routers
+    │   ├── core/             # config, security, deps, errors, rate limits
+    │   ├── db/ models/ repositories/ schemas/ services/
+    │   ├── games/            # SERVER-ONLY: variants, templates, hidden tests
+    │   └── sandbox/          # checkpoint execution sandbox
+    ├── harness/              # SHARED Python harness (canonical copy lives here)
+    ├── content/seed/         # initial level/game JSON
+    ├── alembic/ tests/ Dockerfile docker-compose.yml
+    └── docs/
 ```
-> The **harness** is shared so a snippet behaves identically in the browser (practice) and on the server (checkpoint).
 
----
+**Why the harness lives in the backend repo:** its security-critical consumer is the checkpoint
+grading sandbox, and it must never contain answers (it is public). The frontend runs
+`scripts/sync-harness.mjs` before `dev`/`build`:
+1. If `../backend/harness` exists (local dev) → copy it into `public/harness/`.
+2. Otherwise (Vercel/CI) → download the backend repo at the commit pinned in `harness.lock`.
+
+Result: browser (Pyodide) and server (sandbox) run identical harness code, and a harness change
+reaches the frontend only when `harness.lock` is bumped deliberately. `harness/requirements.txt`
+pins fastapi/pydantic to the versions bundled with the Pyodide release, and the sandbox runs in a
+venv built from it, so grading behaves exactly like the browser.
+
+> **Rule:** nothing in `harness/` may contain hidden tests, reference solutions, or variant logic.
+> That code lives in `backend/app/games/` and never leaves the server.
 
 ## 19. Security, Performance & Accessibility Checklist
 
@@ -824,7 +833,7 @@ backend-city/
 3. **AI provider** (verify current free-tier limits).
 4. **Monetization** (affects Vercel plan and possibly other services).
 5. **Language(s)** — English only at launch, or also Hindi/other languages (i18n affects content model; add a `locale` field early if likely).
-6. **Harness approach** — real FastAPI in Pyodide vs FastAPI-compatible mini framework (decided after Phase 0).
+6. ~~**Harness approach**~~ — **decided:** real FastAPI in Pyodide (Phase 0 spike, see §11.2).
 7. **PGlite vs sql.js** for browser SQL (decided after Phase 0 based on load size).
 8. **OAuth login** (Google/GitHub) — now or later.
 9. **Leaderboard privacy** — public display names, opt-out option.
