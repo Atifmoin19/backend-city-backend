@@ -2,8 +2,9 @@
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import Field, PostgresDsn, SecretStr
+from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,32 @@ class Settings(BaseSettings):
         )
     )
     db_echo: bool = False
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _asyncpg_url(cls, v: object) -> object:
+        """Accept a connection string pasted from Neon/Render as-is.
+
+        asyncpg needs the `postgresql+asyncpg` scheme and `ssl=` (it rejects libpq's `sslmode`
+        and `channel_binding`), so translate those here instead of asking humans to.
+        """
+        if not isinstance(v, str):
+            return v
+        parts = urlsplit(v)
+        scheme = parts.scheme
+        if scheme in ("postgres", "postgresql"):
+            scheme = "postgresql+asyncpg"
+        query = []
+        for key, value in parse_qsl(parts.query):
+            if key == "channel_binding":
+                continue
+            if key == "sslmode":
+                key, value = (
+                    "ssl",
+                    "require" if value in ("require", "verify-ca", "verify-full") else value,
+                )
+            query.append((key, value))
+        return urlunsplit((scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
     # Auth
     jwt_secret: SecretStr = SecretStr("change-me-in-env")

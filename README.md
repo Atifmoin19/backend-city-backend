@@ -62,3 +62,7 @@ boot), database on **Neon**. Not deployed yet — local only for now.
 - [docs/DATABASE.md](docs/DATABASE.md) — tables and migrations
 - [docs/PROGRESS.md](docs/PROGRESS.md) — running log
 - [CLAUDE.md](CLAUDE.md) — guide for AI sessions
+
+## Deploy
+
+Neon (Postgres) + Render (this API, Docker) + Vercel (frontend): [docs/DEPLOY.md](docs/DEPLOY.md).
