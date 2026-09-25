@@ -2,6 +2,22 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
+## 2026-09-25 — Session 1c: first production deploy
+
+### Done
+- Deployed: Neon (Postgres 17, Singapore) + Render free (Docker) + Vercel. Guide: docs/DEPLOY.md.
+- Settings accept Neon connection strings as pasted (`sslmode`/`channel_binding` translated).
+- Found in production: Render's 0.1 CPU needs several seconds just to start the sandbox Python
+  and import FastAPI/Pydantic, so every checkpoint timed out. The sandbox now has two budgets:
+  `SANDBOX_STARTUP_SECONDS` (interpreter + imports, default 20) and `SANDBOX_TIMEOUT_SECONDS`
+  (learner code, 4, enforced in-child by `setitimer` with a BaseException the code can't
+  swallow). The parent keeps a hard wall-clock kill (startup + code) as backstop.
+  Verified in Docker at `--cpus=0.1`: old budget timed out in 4.2 s, new one grades in 11 s.
+- 50 tests pass.
+
+### Next up
+- Warm sandbox (pre-imported fork server) to bring grading from ~10 s to ~1 s on small CPUs.
+
 ## 2026-09-25 — Session 1b: clearer missions
 
 ### Done
