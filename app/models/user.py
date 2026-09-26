@@ -24,3 +24,5 @@ class User(UUIDPrimaryKey, CreatedAt, Base):
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Track slug the learner chose at signup ("Which side of the city?")
     learning_goal: Mapped[str | None] = mapped_column(String(80))
+    # District the placement quiz suggested starting from (e.g. "signal-tower")
+    start_district: Mapped[str | None] = mapped_column(String(40))

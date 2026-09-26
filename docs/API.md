@@ -104,6 +104,15 @@ Every published topic in curriculum order. `track` limits it to one city (track 
 Body `{ "onboarded": bool, "lessons_done": [topic slug] }`: one-time move of browser-kept progress.
 Checkpoints are never imported (they only count when graded on the server).
 
+### `GET /me/quiz-results` → 200 `{ results: [{ quiz, best_score, total, best_combo, plays }] }`
+Best round per quiz (highest share correct, then combo).
+### `POST /me/quiz-results` → 201 `{ results }` · 422 score/combo above total, bad slug
+Body `{ quiz: slug, score, total (1-100), best_combo?, seconds? }`. Quizzes (Speed Round, Pick the
+Line, placement) are graded in the browser like lesson checks and never gate progress.
+### `PUT /me/placement` → 200 `UserPublic` · 404 `district_not_found`
+Body `{ start_district: district_key }`: where the placement quiz suggests starting. Only a
+suggestion (`UserPublic.start_district`); nothing is unlocked.
+
 ## Admin (role: content_editor or super_admin; 403 `forbidden_role` otherwise)
 Admin payloads include server-only content (hidden tests, reference solutions).
 

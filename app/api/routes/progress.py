@@ -3,8 +3,10 @@ from fastapi import APIRouter, status
 from app.core.deps import CurrentUser, SessionDep
 from app.schemas.auth import UserPublic
 from app.schemas.progress import ProgressImport, ProgressPublic, TopicProgressPublic
+from app.schemas.quiz import PlacementIn, QuizResultIn, QuizResults
 from app.schemas.tracks import InterestList, TrackChoice
 from app.services.progress_service import ProgressService
+from app.services.quiz_service import QuizService
 from app.services.track_service import TrackService
 
 router = APIRouter(prefix="/me", tags=["progress"])
@@ -54,3 +56,21 @@ async def interests(user: CurrentUser, session: SessionDep) -> InterestList:
 async def notify_me(body: TrackChoice, user: CurrentUser, session: SessionDep) -> InterestList:
     """ "Notify me" for a track that isn't open yet. Idempotent."""
     return await TrackService(session).notify_me(user, body.track)
+
+
+@router.get("/quiz-results", response_model=QuizResults)
+async def quiz_results(user: CurrentUser, session: SessionDep) -> QuizResults:
+    """Best round per quiz (Speed Round, Pick the Line, placement)."""
+    return await QuizService(session).results(user)
+
+
+@router.post("/quiz-results", response_model=QuizResults, status_code=status.HTTP_201_CREATED)
+async def record_quiz(body: QuizResultIn, user: CurrentUser, session: SessionDep) -> QuizResults:
+    """Save a finished round. Quizzes are graded in the browser and never gate progress."""
+    return await QuizService(session).record(user, body)
+
+
+@router.put("/placement", response_model=UserPublic)
+async def placement(body: PlacementIn, user: CurrentUser, session: SessionDep) -> UserPublic:
+    """Where the placement quiz suggests starting. A suggestion only: nothing is unlocked."""
+    return UserPublic.model_validate(await QuizService(session).set_placement(user, body))

@@ -44,6 +44,7 @@ class UserPublic(BaseModel):
     is_verified: bool
     onboarded_at: datetime | None = Field(default=None, exclude=True)
     learning_goal: str | None = None  # track slug chosen at signup
+    start_district: str | None = None  # where the placement quiz suggested starting
 
     @computed_field  # type: ignore[prop-decorator]
     @property

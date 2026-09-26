@@ -8,14 +8,15 @@ Neon in production. Async SQLAlchemy 2.1 + asyncpg. UUID primary keys, `created_
 users ─┬─< refresh_tokens
        ├─< email_tokens
        ├─< attempts >── game_versions >── games >── topics >── chapters >── levels >── tracks
-       └─< topic_progress >── topics
+       ├─< topic_progress >── topics
+       └─< quiz_results
 games.current_version_id ──► game_versions.id   (cycle; FK added after both tables)
 game_versions.created_by ──► users.id (SET NULL)
 ```
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `users` | email (unique), password_hash, display_name, role enum `user_role`, is_verified, is_blocked, experience_level, last_active_at, onboarded_at | argon2 hashes; last_active_at set on sign-in/refresh |
+| `users` | email (unique), password_hash, display_name, role enum `user_role`, is_verified, is_blocked, experience_level, last_active_at, onboarded_at, learning_goal, start_district | argon2 hashes; last_active_at set on sign-in/refresh |
 | `refresh_tokens` | user_id, token_hash (unique, sha256), expires_at, revoked_at | rotation + reuse detection |
 | `email_tokens` | user_id, purpose enum (`verify`/`reset`), token_hash, expires_at, used_at | EmailJS flows (not wired yet) |
 | `tracks` | slug (unique), title, description, order, status enum `content_status` | |
@@ -26,6 +27,7 @@ game_versions.created_by ──► users.id (SET NULL)
 | `game_versions` | game_id, version, title, objective, rules, scenario, starter_code, editable_region, public_tests, hidden_test_template, variant_params, reference_solution, visualizer_type, character_key, hints, dialogue (JSONB) | immutable; unique (game_id, version); created_by NULL = from seed files. Server-only fields! |
 | `attempts` | user_id, game_version_id, seed, code, score, passed, hints_used, duration_seconds, is_checkpoint | ix (user_id, game_version_id, seed). Checkpoint: one row per submission (score NULL = opened by a hint). Practice: one row per user+game |
 | `topic_progress` | PK (user_id, topic_id), status enum, best_score, stars, attempts_count, passed_at, lesson_done_at | summary row, written with each attempt |
+| `quiz_results` | user_id, quiz_slug, score, total, best_combo, seconds | one row per finished quiz round (migration `2eda7346d503`); quiz content lives in the frontend |
 
 All FKs `ON DELETE CASCADE` except `current_version_id` / `created_by` (`SET NULL`).
 Constraint names follow `app/db/base.py` naming conventions.
