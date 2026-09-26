@@ -164,7 +164,22 @@ Free instances sleep after 15 minutes without traffic; the first request then ta
 
 ---
 
-## Releasing the progress / content / admin update (2026-09-26)
+## Released: Full Stack City session 4 (2026-09-26)
+
+Done on 2026-09-26: backend `main` → `78023ab`, then frontend `main` → `0f60b55`. Render ran
+migrations `2eda7346d503` (quiz results, `users.start_district`) and `37d08d8cd287`
+(feedback) plus the seed (Front Desk, Score Board) on start; Neon reports head
+`37d08d8cd287`. The harness did not change, so `harness.lock` stayed as it was.
+
+New, optional env vars (defaults are fine): `SANDBOX_PARALLEL` (2), `FEEDBACK_RATE_LIMIT`
+(`10/hour`). Still to confirm: `PROXY_SHARED_SECRET` set on Render and Vercel.
+
+Order for releases like this one: backend first (new endpoints + migrations), wait for
+`/health` and a new route to answer, then the frontend.
+
+---
+
+## Releasing the progress / content / admin update (2026-09-26, released)
 
 Both repos changed together and the shared harness changed (v0.2.0: `expect_body`), so order
 matters:

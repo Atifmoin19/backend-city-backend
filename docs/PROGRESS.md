@@ -2,7 +2,7 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
-## 2026-09-26 — Session 4: Academy practice games
+## 2026-09-26 — Session 4: Academy games, quizzes, rewards, analytics, parallel sandbox
 
 ### Done
 - Two Academy practice games (`game_type: python_basics`), graded on the JSON body:
@@ -25,6 +25,15 @@ Running log. Newest entry on top. Update at the end of every task.
   (0 extra download, same engine in browser and grader); numbers + sandbox caveats in
   ARCHITECTURE.md "Key decisions".
 - API title is now "Full Stack City API". 183 tests pass.
+- Released to production (Render + Neon, head `37d08d8cd287`).
+
+### Next up (owner decides)
+1. Email flows: verify email, forgot/reset password (EmailJS).
+2. Admin: create games/topics from the panel, audit log; serve the topic → game list to the
+   frontend.
+3. Data Vaults (Level 3): allow `sqlite3` in the policy + audit hook limited to `:memory:`,
+   then SQL / SQLAlchemy / N+1 games.
+4. Phase 3 and 4 (owner will pick).
 
 ## 2026-09-26 — Session 3: Full Stack City (tracks + interest)
 

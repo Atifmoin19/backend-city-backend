@@ -1,4 +1,4 @@
-# CLAUDE.md — Backend City backend
+# CLAUDE.md — Full Stack City backend
 
 Gamified backend-learning platform. This repo = FastAPI API + grading sandbox + shared harness.
 Source of truth: [docs/PROJECT_IDEOLOGY.md](docs/PROJECT_IDEOLOGY.md). Read it before big changes;
@@ -14,7 +14,8 @@ if a change contradicts it, raise it with the owner first.
 - `app/core/` config, security, cookies, deps (auth/role guards), errors, rate limits
 - `app/schemas/` Pydantic request/response models (learner-safe only)
 - `app/games/` SERVER-ONLY game logic: content schemas, DB catalog, seed sync, variants, hidden-test generators, validation
-- `app/sandbox/` policy (AST allowlist), entry (cold child / warm fork server), executor (runs + scores in the API)
+- `app/sandbox/` policy (AST allowlist), entry (cold child / warm fork server running `SANDBOX_PARALLEL` children), executor (runs + scores in the API)
+- `app/services/rewards.py` XP / levels / streaks / badges as pure rules over existing records (nothing stored); quizzes are graded in the browser, the API only keeps `quiz_results`
 - `harness/` SHARED with frontend Pyodide — public code, pure Python, no app imports
 - `content/seed/` curriculum + game JSON, synced to the DB by `python -m app.games.seed` (admins own published versions afterwards)
 

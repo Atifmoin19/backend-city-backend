@@ -1,6 +1,6 @@
-# Backend City — Backend
+# Full Stack City — Backend
 
-FastAPI backend for **Backend City**, a gamified platform that takes learners from zero to
+FastAPI backend for **Full Stack City** (formerly Backend City), a gamified platform that takes learners from zero to
 job-ready backend developer. This repo owns auth, progress, checkpoint grading (sandboxed),
 content APIs, and the shared Python **harness** that also runs in the browser via Pyodide.
 
@@ -48,9 +48,10 @@ All documented in [.env.example](.env.example); loaded through typed settings in
 | `JWT_SECRET` | Signs access + attempt tokens. Long random string |
 | `ACCESS_TOKEN_TTL_MINUTES` / `REFRESH_TOKEN_TTL_DAYS` | Token lifetimes |
 | `COOKIE_SECURE` / `COOKIE_DOMAIN` / `REFRESH_COOKIE_PATH` | Auth cookie attributes |
-| `RATE_LIMIT_ENABLED`, `AUTH_RATE_LIMIT`, `CHECKPOINT_RATE_LIMIT` | slowapi limits |
+| `RATE_LIMIT_ENABLED`, `AUTH_RATE_LIMIT`, `CHECKPOINT_RATE_LIMIT`, `FEEDBACK_RATE_LIMIT` | slowapi limits |
+| `PROXY_SHARED_SECRET` | Lets the frontend proxy pass the real client IP for rate limits |
 | `CORS_ORIGINS` | Only for direct browser calls; prod is same-origin via Next.js rewrites |
-| `SANDBOX_*` | Grading sandbox timeout, memory, snippet size, interpreter |
+| `SANDBOX_*` | Grading sandbox timeout, memory, snippet size, interpreter; `SANDBOX_PARALLEL` = grades the warm server runs at once (default 2) |
 
 ## Deployment
 Live at **https://backend-city-api.onrender.com** (Render free web service from the
