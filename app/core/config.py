@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # App
-    app_name: str = "Backend City API"
+    app_name: str = "Full Stack City API"
     environment: Literal["local", "test", "production"] = "local"
     debug: bool = False
     api_prefix: str = ""
