@@ -63,4 +63,5 @@ Live at **https://backend-city-api.onrender.com** (Render free web service from 
 - [docs/API.md](docs/API.md) — endpoints and shapes
 - [docs/DATABASE.md](docs/DATABASE.md) — tables and migrations
 - [docs/PROGRESS.md](docs/PROGRESS.md) — running log
+- Release notes (both repos, versioned): `FEATURES.md` in the frontend repo
 - [CLAUDE.md](CLAUDE.md) — guide for AI sessions

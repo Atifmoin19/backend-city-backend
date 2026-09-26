@@ -30,3 +30,4 @@ if a change contradicts it, raise it with the owner first.
 - `harness/requirements.txt` must match the Pyodide release the frontend uses.
 - Errors: raise `AppError` subclasses → `{"error": {"code", "message"}}`.
 - Update `docs/PROGRESS.md` (and API/DATABASE docs when relevant) at the end of every task.
+- Every user-facing change goes in the frontend repo's `FEATURES.md` (shared release notes) with a version bump: minor for major additions, patch for small ones (fix, validation rule, tweak). Keep `pyproject.toml` on the same version as the frontend `package.json`. Docs-only changes don't bump.
