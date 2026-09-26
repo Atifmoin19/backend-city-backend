@@ -97,3 +97,21 @@ it for now; if abuse appears, move grading to an isolated worker (ideology §11.
 - **Hints on demand**: `hint_tiers` only in payload; text from `POST /games/{slug}/hint`; on a
   checkpoint each tier is recorded on the attempt and costs 5 points.
 - **In-memory rate limits**: fine for one instance; switch slowapi storage to Redis to scale out.
+- **SQL engine for the Data Vaults (spike, 2026-09-26): Python `sqlite3` in the existing
+  harness, not PGlite or sql.js.** Measured (Node, same wasm the browser loads):
+
+  | Option | Download (brotli) | Start | Postgres dialect | Runs in the grader too |
+  |---|---|---|---|---|
+  | PGlite 0.5.8 | ~3.8 MB (wasm 2.6 + data 1.1 + initdb 0.1) | ~930 ms | yes (ILIKE, JSONB, real EXPLAIN) | no: a second engine next to Python |
+  | sql.js 1.14 | ~0.28 MB | ~12 ms | no (no ILIKE; SQLite EXPLAIN) | no: JS only |
+  | Pyodide stdlib `sqlite3` (SQLite 3.39) | 0 extra (in `python_stdlib.zip`) | ~13 ms incl. schema + join | no | yes: same Python, same harness |
+
+  The Data Vaults games are FastAPI handlers that query a database (SQL, then SQLAlchemy, then
+  N+1), so the database has to live where the handler runs. `sqlite3` is already in Pyodide and
+  in the server sandbox, so practice and grading stay identical. ORM games add SQLAlchemy
+  2.0.48 (Pyodide wheel ~2 MB, `loadPackage("sqlalchemy")`; pin the same in
+  `harness/requirements.txt`). Briefings should note where Postgres differs (SERIAL, ILIKE,
+  JSONB). Revisit PGlite only if a pure-SQL game needs Postgres-only features.
+  **Before shipping:** allow `sqlite3` / `sqlalchemy` in the policy allowlist and make the audit
+  hook reject any `sqlite3.connect` target other than `":memory:"` (a file path would give
+  learner code file access).

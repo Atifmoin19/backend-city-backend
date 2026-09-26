@@ -12,6 +12,9 @@ Running log. Newest entry on top. Update at the end of every task.
 - Quizzes: `quiz_results` table + `GET/POST /me/quiz-results` (best round per quiz), and
   `users.start_district` + `PUT /me/placement` (placement suggestion only). Migration
   `2eda7346d503`.
+- Spike (PGlite vs sql.js): neither. Data Vaults games use Python `sqlite3` inside the harness
+  (0 extra download, same engine in browser and grader); numbers + sandbox caveats in
+  ARCHITECTURE.md "Key decisions".
 - API title is now "Full Stack City API". 171 tests pass.
 
 ## 2026-09-26 — Session 3: Full Stack City (tracks + interest)
