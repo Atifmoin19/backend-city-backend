@@ -2,6 +2,7 @@
 
 from app.models.attempt import Attempt
 from app.models.chapter import Chapter
+from app.models.feedback import Feedback
 from app.models.game import Game, GameVersion
 from app.models.interest import TrackInterest
 from app.models.level import Level
@@ -16,6 +17,7 @@ __all__ = [
     "Attempt",
     "Chapter",
     "EmailToken",
+    "Feedback",
     "Game",
     "GameVersion",
     "Level",

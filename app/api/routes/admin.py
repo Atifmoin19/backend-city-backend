@@ -20,8 +20,17 @@ from app.schemas.admin import (
     UserBlockUpdate,
     UserRoleUpdate,
 )
+from app.schemas.analytics import AdminAnalytics
 from app.schemas.auth import UserPublic
+from app.schemas.feedback import (
+    AdminFeedback,
+    AdminFeedbackList,
+    FeedbackStatus,
+    FeedbackStatusUpdate,
+)
 from app.services.admin_service import ContentAdminService, UserAdminService
+from app.services.analytics_service import AnalyticsService
+from app.services.feedback_service import FeedbackService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -122,3 +131,23 @@ async def role(
 async def reset(user_id: uuid.UUID, _: SuperAdminUser, session: SessionDep) -> AdminUserDetail:
     """Delete the learner's attempts and topic progress."""
     return await UserAdminService(session).reset_progress(user_id)
+
+
+@router.get("/analytics", response_model=AdminAnalytics)
+async def analytics(_: AdminUser, session: SessionDep) -> AdminAnalytics:
+    """Learners, the per-topic drop-off funnel, hardest games and quiz stats."""
+    return await AnalyticsService(session).overview()
+
+
+@router.get("/feedback", response_model=AdminFeedbackList)
+async def feedback_inbox(
+    _: AdminUser, session: SessionDep, status: FeedbackStatus | None = None
+) -> AdminFeedbackList:
+    return await FeedbackService(session).inbox(status)
+
+
+@router.patch("/feedback/{feedback_id}", response_model=AdminFeedback)
+async def feedback_status(
+    feedback_id: uuid.UUID, body: FeedbackStatusUpdate, _: AdminUser, session: SessionDep
+) -> AdminFeedback:
+    return await FeedbackService(session).set_status(feedback_id, body.status)

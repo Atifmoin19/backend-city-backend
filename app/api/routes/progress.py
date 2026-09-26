@@ -1,11 +1,15 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
+from app.core.config import get_settings
 from app.core.deps import CurrentUser, SessionDep
+from app.core.rate_limit import limiter, user_or_ip
 from app.schemas.auth import UserPublic
+from app.schemas.feedback import FeedbackIn
 from app.schemas.progress import ProgressImport, ProgressPublic, TopicProgressPublic
 from app.schemas.quiz import PlacementIn, QuizResultIn, QuizResults
 from app.schemas.stats import StatsPublic
 from app.schemas.tracks import InterestList, TrackChoice
+from app.services.feedback_service import FeedbackService
 from app.services.progress_service import ProgressService
 from app.services.quiz_service import QuizService
 from app.services.stats_service import StatsService
@@ -83,3 +87,12 @@ async def stats(user: CurrentUser, session: SessionDep, tz: str | None = None) -
     """XP, level, streak and badges, derived from the learner's history. `tz` (IANA name, e.g.
     Asia/Kolkata) sets where a day starts for streaks; unknown or missing means UTC."""
     return await StatsService(session).stats(user, tz)
+
+
+@router.post("/feedback", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(get_settings().feedback_rate_limit, key_func=user_or_ip)
+async def send_feedback(
+    request: Request, body: FeedbackIn, user: CurrentUser, session: SessionDep
+) -> None:
+    """A bug report, idea or content note for the team (admin inbox)."""
+    await FeedbackService(session).send(user, body)

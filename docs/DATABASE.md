@@ -9,7 +9,8 @@ users ─┬─< refresh_tokens
        ├─< email_tokens
        ├─< attempts >── game_versions >── games >── topics >── chapters >── levels >── tracks
        ├─< topic_progress >── topics
-       └─< quiz_results
+       ├─< quiz_results
+       └─< feedback (SET NULL)
 games.current_version_id ──► game_versions.id   (cycle; FK added after both tables)
 game_versions.created_by ──► users.id (SET NULL)
 ```
@@ -28,12 +29,12 @@ game_versions.created_by ──► users.id (SET NULL)
 | `attempts` | user_id, game_version_id, seed, code, score, passed, hints_used, duration_seconds, is_checkpoint | ix (user_id, game_version_id, seed). Checkpoint: one row per submission (score NULL = opened by a hint). Practice: one row per user+game |
 | `topic_progress` | PK (user_id, topic_id), status enum, best_score, stars, attempts_count, passed_at, lesson_done_at | summary row, written with each attempt |
 | `quiz_results` | user_id, quiz_slug, score, total, best_combo, seconds | one row per finished quiz round (migration `2eda7346d503`); quiz content lives in the frontend |
+| `feedback` | user_id (SET NULL), kind, message, page, game_slug, status (`new`/`seen`/`done`) | learner notes for the admin inbox (migration `37d08d8cd287`) |
 
 All FKs `ON DELETE CASCADE` except `current_version_id` / `created_by` (`SET NULL`).
 Constraint names follow `app/db/base.py` naming conventions.
 
-Not yet created (ideology §15, later phases): lessons, chapter/level progress, xp_events,
-streaks, badges, ai_*, feedback, announcements, audit_logs, usage_counters.
+Not yet created (ideology §15, later phases): lessons, chapter/level progress, ai_*, announcements, audit_logs, usage_counters. XP, streaks and badges are derived, not stored (`app/services/rewards.py`).
 
 ## Content seed
 `python -m app.games.seed` (run on every container start and by the tests) syncs

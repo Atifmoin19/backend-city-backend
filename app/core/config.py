@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     auth_rate_limit: str = "10/minute"
     checkpoint_rate_limit: str = "20/minute"
+    feedback_rate_limit: str = "10/hour"
     # Shared with the frontend proxy (PROXY_SHARED_SECRET on Vercel). When a request carries
     # it, its X-BC-Client-IP header is the learner's real IP; every request otherwise looks
     # like it came from Vercel, so all learners would share one rate-limit bucket.

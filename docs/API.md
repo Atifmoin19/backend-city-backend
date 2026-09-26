@@ -109,6 +109,8 @@ Best round per quiz (highest share correct, then combo).
 ### `POST /me/quiz-results` → 201 `{ results }` · 422 score/combo above total, bad slug
 Body `{ quiz: slug, score, total (1-100), best_combo?, seconds? }`. Quizzes (Speed Round, Pick the
 Line, placement) are graded in the browser like lesson checks and never gate progress.
+### `POST /me/feedback` → 204 · 422 · 429 (10/hour per learner)
+Body `{ kind: "bug"|"idea"|"content"|"other", message (3-2000), page?, game_slug? }`.
 ### `GET /me/stats?tz=Asia/Kolkata` → 200 `{ xp, level: { level, xp_into, xp_needed }, streak: { current, best, active_today }, badges: [{ key, title, description, earned_at|null }] }`
 Derived from attempts, topic progress and quiz rounds (nothing stored; rules in
 `app/services/rewards.py`): briefing 20 XP, practice game 30, checkpoint 100 + 25/star, quiz
@@ -143,6 +145,15 @@ Re-runs the test on seeds 1–3; any issue → 400 `publish_blocked`. Otherwise 
 ### `GET /admin/users/{id}` → `{ user, progress, attempts }` (50 newest attempts)
 ### super_admin only: `POST /admin/users/{id}/block {blocked}`, `/role {role}`, `/reset`
 Acting on your own account → 403 `self_action`.
+
+### `GET /admin/analytics` → 200 `AdminAnalytics`
+`{ learners: { total, active_7d, active_30d, signups_14d: [{ day, count }] }, funnel: [{ topic,
+title, district, briefed, practiced, attempted|null, passed|null }], games: [{ slug, title, topic,
+is_checkpoint, players, attempts, pass_rate, avg_score|null, avg_hints|null }] (hardest first),
+quizzes: [{ quiz, rounds, players, avg_pct }] }`. Lesson-only topics have null checkpoint columns.
+### `GET /admin/feedback?status=new|seen|done` → 200 `{ items: [AdminFeedback], counts }`
+### `PATCH /admin/feedback/{id}` → 200 `AdminFeedback` · 404 `feedback_not_found`
+Body `{ status: "new"|"seen"|"done" }`.
 
 ## Rate limits
 Auth routes: 10/min per client IP. Games routes: 20/min per signed-in user (per IP for visitors).

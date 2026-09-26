@@ -12,13 +12,17 @@ Running log. Newest entry on top. Update at the end of every task.
 - Quizzes: `quiz_results` table + `GET/POST /me/quiz-results` (best round per quiz), and
   `users.start_district` + `PUT /me/placement` (placement suggestion only). Migration
   `2eda7346d503`.
+- **Admin analytics** (`GET /admin/analytics`): accounts, active 7/30 days, 14-day signups,
+  per-topic funnel (briefed → practiced → attempted → passed), games by pass rate (hardest
+  first, all versions counted), quiz stats. **Feedback inbox**: `POST /me/feedback` (10/hour),
+  `GET/PATCH /admin/feedback`. Migration `37d08d8cd287`.
 - **XP, levels, streaks, badges**: `GET /me/stats` derives them from existing records (so past
   work counts; nothing new is stored). 11 badges with earned dates; lesson-only topics never
   count as checkpoint passes.
 - Spike (PGlite vs sql.js): neither. Data Vaults games use Python `sqlite3` inside the harness
   (0 extra download, same engine in browser and grader); numbers + sandbox caveats in
   ARCHITECTURE.md "Key decisions".
-- API title is now "Full Stack City API". 179 tests pass.
+- API title is now "Full Stack City API". 181 tests pass.
 
 ## 2026-09-26 — Session 3: Full Stack City (tracks + interest)
 
