@@ -4,9 +4,11 @@ from app.core.deps import CurrentUser, SessionDep
 from app.schemas.auth import UserPublic
 from app.schemas.progress import ProgressImport, ProgressPublic, TopicProgressPublic
 from app.schemas.quiz import PlacementIn, QuizResultIn, QuizResults
+from app.schemas.stats import StatsPublic
 from app.schemas.tracks import InterestList, TrackChoice
 from app.services.progress_service import ProgressService
 from app.services.quiz_service import QuizService
+from app.services.stats_service import StatsService
 from app.services.track_service import TrackService
 
 router = APIRouter(prefix="/me", tags=["progress"])
@@ -74,3 +76,10 @@ async def record_quiz(body: QuizResultIn, user: CurrentUser, session: SessionDep
 async def placement(body: PlacementIn, user: CurrentUser, session: SessionDep) -> UserPublic:
     """Where the placement quiz suggests starting. A suggestion only: nothing is unlocked."""
     return UserPublic.model_validate(await QuizService(session).set_placement(user, body))
+
+
+@router.get("/stats", response_model=StatsPublic)
+async def stats(user: CurrentUser, session: SessionDep, tz: str | None = None) -> StatsPublic:
+    """XP, level, streak and badges, derived from the learner's history. `tz` (IANA name, e.g.
+    Asia/Kolkata) sets where a day starts for streaks; unknown or missing means UTC."""
+    return await StatsService(session).stats(user, tz)
