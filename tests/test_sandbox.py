@@ -247,3 +247,84 @@ async def test_a_runaway_grade_does_not_hold_up_a_quick_one() -> None:
     assert quick.report is not None and quick.report["results"][0]["passed"]
     assert time.monotonic() - start < 1.5  # did not wait for the 2 s loop
     assert (await slow).timed_out
+
+
+SQL_APP = (
+    "import sqlite3\n"
+    "from fastapi import FastAPI\n"
+    "app = FastAPI()\n"
+    "@app.get('/q')\n"
+    "async def q() -> dict[str, object]:\n"
+    "    db = sqlite3.connect(DB)\n"
+    "    db.execute('CREATE TABLE t (n INTEGER)')\n"
+    "    db.executemany('INSERT INTO t VALUES (?)', [(1,), (2,), (3,)])\n"
+    "    EXTRA\n"
+    "    return {'sum': db.execute('SELECT sum(n) FROM t').fetchone()[0]}\n"
+)
+SQL_TEST = [{"name": "q", "request": {"method": "GET", "path": "/q"}, "expect_status": 200}]
+
+
+def sql_app(db: str = "':memory:'", extra: str = "pass") -> str:
+    return SQL_APP.replace("DB", db).replace("EXTRA", extra)
+
+
+@pytestmark_engine
+async def test_sqlite_in_memory_works() -> None:
+    result = await execute(sql_app(), SQL_TEST, LIMITS)
+    assert result.report is not None
+    assert result.report["results"][0]["body"] == {"sum": 6}
+
+
+@pytestmark_engine
+@pytest.mark.parametrize(
+    ("db", "extra"),
+    [
+        ("'/tmp/vault.db'", "pass"),  # a database file
+        ("'file:x?mode=memory'", "pass"),  # URI tricks count as files too
+        ("':memory:'", "db.enable_load_extension(True)"),
+        ("':memory:'", "sqlite3.Connection('/tmp/y.db')"),
+    ],
+)
+async def test_sqlite_cannot_reach_the_filesystem(db: str, extra: str) -> None:
+    result = await execute(sql_app(db, extra), SQL_TEST, LIMITS)
+    assert result.report is not None
+    assert result.report["results"][0]["status"] == 500  # the handler was stopped
+
+
+@pytestmark_engine
+async def test_the_vault_refuses_attach() -> None:
+    src = (
+        "from fastapi import FastAPI\n"
+        "from harness.vault import open_vault\n"
+        "db = open_vault('CREATE TABLE t (n INTEGER); INSERT INTO t VALUES (7);')\n"
+        "app = FastAPI()\n"
+        "@app.get('/ok')\n"
+        "async def ok() -> dict[str, int]:\n"
+        "    return {'n': db.execute('SELECT n FROM t').fetchone()[0]}\n"
+        "@app.get('/attach')\n"
+        "async def attach() -> dict[str, str]:\n"
+        "    db.execute(\"ATTACH DATABASE '/tmp/x.db' AS x\")\n"
+        "    return {'x': 'attached'}\n"
+    )
+    tests = [
+        {"name": "ok", "request": {"method": "GET", "path": "/ok"}, "expect_status": 200},
+        {"name": "attach", "request": {"method": "GET", "path": "/attach"}, "expect_status": 500},
+    ]
+    result = await execute(src, tests, LIMITS)
+    assert result.report is not None
+    ok, attach = result.report["results"]
+    assert ok["body"] == {"n": 7}
+    assert attach["status"] == 500
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        "db.set_authorizer(None)",
+        "db.setlimit(10, 10)",
+        "db.enable_load_extension(True)",
+        "import sqlite3",
+    ],
+)
+def test_policy_protects_the_vault_guard(snippet: str) -> None:
+    assert check_snippet(snippet, max_chars=500)

@@ -2,10 +2,11 @@
 
 SHARED CODE: these files are copied into the frontend and executed inside Pyodide, and
 also run on the server inside the grading sandbox. Therefore:
-  * Pure Python only; depends only on fastapi/pydantic (versions pinned in requirements.txt
-    to match the Pyodide distribution).
+  * Pure Python only; depends on fastapi/pydantic (versions pinned in requirements.txt to
+    match the Pyodide distribution) and the standard library (sqlite3 for the Data Vaults,
+    see vault.py).
   * NEVER put hidden tests, reference solutions, or variant generation logic here —
     everything in this folder is public.
 """
 
-HARNESS_VERSION = "0.2.0"
+HARNESS_VERSION = "0.3.0"

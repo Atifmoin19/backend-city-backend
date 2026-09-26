@@ -46,6 +46,12 @@ BLOCKED_NAMES: frozenset[str] = frozenset(
 )
 
 
+# Methods that would undo the Data Vaults database guard (harness/vault.py)
+BLOCKED_ATTRIBUTES: frozenset[str] = frozenset(
+    {"set_authorizer", "setlimit", "enable_load_extension", "load_extension", "deserialize"}
+)
+
+
 @dataclass(frozen=True)
 class PolicyViolation:
     line: int
@@ -72,6 +78,8 @@ def check_snippet(snippet: str, *, max_chars: int) -> list[PolicyViolation]:
             root = (node.module or "").split(".")[0]
             if node.level or root not in ALLOWED_IMPORTS:
                 violations.append(PolicyViolation(line, f"Import not allowed: {node.module}"))
+        elif isinstance(node, ast.Attribute) and node.attr in BLOCKED_ATTRIBUTES:
+            violations.append(PolicyViolation(line, f"`.{node.attr}` is not allowed"))
         elif isinstance(node, ast.Name) and node.id in BLOCKED_NAMES:
             violations.append(PolicyViolation(line, f"Use of `{node.id}` is not allowed"))
         elif isinstance(node, ast.Attribute) and node.attr.startswith("__"):

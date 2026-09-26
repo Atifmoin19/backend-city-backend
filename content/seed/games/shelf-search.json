@@ -1,0 +1,117 @@
+{
+  "slug": "shelf-search",
+  "game_type": "sql_query",
+  "title": "Shelf Search",
+  "character": "librarian",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The vault's search desk hands back every item on every shelf, in no order at all.",
+    "goal": "Ask the database for items up to `max_price`, cheapest first, with a `?` parameter."
+  },
+  "objective": "The desk lists only what you can afford, cheapest first.",
+  "rules": [
+    "Only items with `price <= max_price`.",
+    "Cheapest first (`ORDER BY price`).",
+    "Pass `max_price` as a `?` parameter, never inside the SQL string."
+  ],
+  "variant_params": {
+    "gem": [
+      "Moonstone",
+      "Sunstone"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, HTTPException\nfrom harness.vault import open_vault\n\n# The vault: an in-memory SQLite database (tables vaults and items, see SCHEMA)\nSCHEMA = \"\"\"\nCREATE TABLE vaults (name TEXT PRIMARY KEY, floor INTEGER, keeper TEXT);\nINSERT INTO vaults VALUES ('North', 1, 'Ada'), ('South', 2, 'Grace'), ('Deep', -1, 'Linus');\nCREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, vault TEXT, price INTEGER);\nINSERT INTO items VALUES\n  (1, 'Crown', 'North', 950), (2, 'Map', 'North', 12), (3, 'Lantern', 'North', 40),\n  (4, 'Key', 'South', 25), (5, 'Ledger', 'South', 60),\n  (6, '{{gem}}', 'Deep', 700), (7, 'Rope', 'Deep', 8);\n\"\"\"\ndb = open_vault(SCHEMA)\napp = FastAPI()\n\n\n@app.get(\"/items\")\nasync def items(max_price: int = 100) -> dict[str, list[str]]:\n    # >>> EDIT START\n    rows = db.execute(\"SELECT name FROM items\").fetchall()\n    # <<< EDIT END\n    return {\"items\": [name for (name,) in rows]}\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Up to 50",
+      "request": {
+        "method": "GET",
+        "path": "/items",
+        "query": "max_price=50"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "items": [
+          "Rope",
+          "Map",
+          "Key",
+          "Lantern"
+        ]
+      }
+    },
+    {
+      "name": "Default budget (100)",
+      "request": {
+        "method": "GET",
+        "path": "/items"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "items": [
+          "Rope",
+          "Map",
+          "Key",
+          "Lantern",
+          "Ledger"
+        ]
+      }
+    },
+    {
+      "name": "Everything",
+      "request": {
+        "method": "GET",
+        "path": "/items",
+        "query": "max_price=1000"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "items": [
+          "Rope",
+          "Map",
+          "Key",
+          "Lantern",
+          "Ledger",
+          "{{gem}}",
+          "Crown"
+        ]
+      }
+    },
+    {
+      "name": "Nothing that cheap",
+      "request": {
+        "method": "GET",
+        "path": "/items",
+        "query": "max_price=5"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "items": []
+      }
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "rows = db.execute(\n    \"SELECT name FROM items WHERE price <= ? ORDER BY price\", (max_price,)\n).fetchall()\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "SQL reads like a sentence: SELECT what FROM where WHERE condition ORDER BY column."
+    },
+    {
+      "tier": 2,
+      "text": "Put a ? in the SQL where the value goes, and pass the values as a tuple: db.execute(sql, (max_price,)). The comma makes it a tuple."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: \"SELECT name FROM items WHERE price <= ? ORDER BY price\", (max_price,)"
+    }
+  ],
+  "dialogue": {
+    "start": "Every shelf at once? Nobody can find anything like this.",
+    "success": "Neat rows, cheapest first. Just how I like my shelves.",
+    "fail": "Some items are out of budget or out of order."
+  }
+}

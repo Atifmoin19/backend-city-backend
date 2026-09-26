@@ -89,6 +89,28 @@
           ]
         }
       ]
+    },
+    {
+      "slug": "data-vaults",
+      "title": "The Data Vaults",
+      "district_key": "data-vaults",
+      "chapters": [
+        {
+          "slug": "sql-basics",
+          "title": "SQL: asking the database",
+          "topics": [
+            {
+              "slug": "query-the-vault",
+              "title": "Ask the vault the right question",
+              "practice": [
+                "shelf-search",
+                "item-floors"
+              ],
+              "checkpoint": "vault-ledger"
+            }
+          ]
+        }
+      ]
     }
   ],
   "coming_soon": [

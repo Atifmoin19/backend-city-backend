@@ -1,0 +1,97 @@
+{
+  "slug": "item-floors",
+  "game_type": "sql_query",
+  "title": "Item Floors",
+  "character": "librarian",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "Visitors ask where an item is kept. The desk knows the vault but not which floor it's on.",
+    "goal": "JOIN items with vaults to answer with the floor, and 404 for items that don't exist."
+  },
+  "objective": "Every item comes back with its vault and floor; unknown ids get a 404.",
+  "rules": [
+    "Answer `name`, `vault` and `floor` (from the `vaults` table).",
+    "Join `items.vault` to `vaults.name`.",
+    "An id that isn't in the vault answers 404."
+  ],
+  "variant_params": {
+    "gem": [
+      "Moonstone",
+      "Sunstone"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, HTTPException\nfrom harness.vault import open_vault\n\n# The vault: an in-memory SQLite database (tables vaults and items, see SCHEMA)\nSCHEMA = \"\"\"\nCREATE TABLE vaults (name TEXT PRIMARY KEY, floor INTEGER, keeper TEXT);\nINSERT INTO vaults VALUES ('North', 1, 'Ada'), ('South', 2, 'Grace'), ('Deep', -1, 'Linus');\nCREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, vault TEXT, price INTEGER);\nINSERT INTO items VALUES\n  (1, 'Crown', 'North', 950), (2, 'Map', 'North', 12), (3, 'Lantern', 'North', 40),\n  (4, 'Key', 'South', 25), (5, 'Ledger', 'South', 60),\n  (6, '{{gem}}', 'Deep', 700), (7, 'Rope', 'Deep', 8);\n\"\"\"\ndb = open_vault(SCHEMA)\napp = FastAPI()\n\n\n@app.get(\"/items/{item_id}\")\nasync def item(item_id: int) -> dict[str, object]:\n    # >>> EDIT START\n    row = db.execute(\"SELECT name, vault FROM items WHERE id = ?\", (item_id,)).fetchone()\n    return {\"name\": row[0], \"vault\": row[1], \"floor\": None}\n    # <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "The crown",
+      "request": {
+        "method": "GET",
+        "path": "/items/1"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "name": "Crown",
+        "vault": "North",
+        "floor": 1
+      }
+    },
+    {
+      "name": "Deep down",
+      "request": {
+        "method": "GET",
+        "path": "/items/6"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "name": "{{gem}}",
+        "vault": "Deep",
+        "floor": -1
+      }
+    },
+    {
+      "name": "A key",
+      "request": {
+        "method": "GET",
+        "path": "/items/4"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "vault": "South",
+        "floor": 2
+      }
+    },
+    {
+      "name": "No such item",
+      "request": {
+        "method": "GET",
+        "path": "/items/99"
+      },
+      "expect_status": 404
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "row = db.execute(\n    \"SELECT i.name, i.vault, v.floor FROM items i \"\n    \"JOIN vaults v ON v.name = i.vault WHERE i.id = ?\",\n    (item_id,),\n).fetchone()\nif row is None:\n    raise HTTPException(status_code=404, detail=\"No such item\")\nreturn {\"name\": row[0], \"vault\": row[1], \"floor\": row[2]}\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "The floor lives in another table. JOIN puts two tables side by side where a column matches."
+    },
+    {
+      "tier": 2,
+      "text": "FROM items i JOIN vaults v ON v.name = i.vault gives each item its vault's row. fetchone() returns None when nothing matched."
+    },
+    {
+      "tier": 3,
+      "text": "Select i.name, i.vault, v.floor with that JOIN and WHERE i.id = ?; if row is None, raise HTTPException(status_code=404)."
+    }
+  ],
+  "dialogue": {
+    "start": "They keep asking which floor. I keep shrugging.",
+    "success": "Item, vault, floor. The visitors stopped wandering.",
+    "fail": "Some answers are missing the floor, or a missing item crashed the desk."
+  }
+}

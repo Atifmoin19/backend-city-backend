@@ -48,6 +48,7 @@ async def test_content_tree_lists_every_game(client: AsyncClient, db: AsyncSessi
         "signal-tower",
         "router-station",
         "gatehouse",
+        "data-vaults",
     ]
     gate = levels[3]["topics"][0]
     assert [g["slug"] for g in gate["games"]] == ["ticket-booth", "badge-check", "signup-gate"]

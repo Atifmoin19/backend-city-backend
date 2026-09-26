@@ -10,6 +10,13 @@ Running log. Newest entry on top. Update at the end of every task.
 - Account emails: `/auth/verify-email`, `/verify-email/resend`, `/forgot-password`,
   `/reset-password` on the existing `email_tokens` table (no migration). EmailJS REST from the
   server via httpx; unconfigured = link logged (never in production). 191 tests pass.
+- **Data Vaults (Level 3)**: harness 0.3.0 adds `harness/vault.py` (in-memory SQLite with an
+  ATTACH-blocking authorizer, opened by starter code only). Sandbox: audit hook refuses any
+  non-`:memory:` connection and extension loading; policy blocks `set_authorizer`, `setlimit`,
+  `load_extension`; `sqlite3` is not importable by learners. Games: shelf-search, item-floors,
+  vault-ledger (checkpoint, SQL-injection hidden test). 226 tests pass.
+  Residual risk (documented): a policy escape could only open existing SQLite files or create
+  empty ones; writes are capped at 0 bytes by RLIMIT_FSIZE.
 
 ## 2026-09-26 — Session 4: Academy games, quizzes, rewards, analytics, parallel sandbox
 
@@ -40,8 +47,8 @@ Running log. Newest entry on top. Update at the end of every task.
 1. ~~Email flows~~ done in v1.12.0 (EmailJS keys still to be set on Render).
 2. Admin: create games/topics from the panel, audit log (the topic → game list is served
    since v1.12.1: `TopicProgress.games`).
-3. Data Vaults (Level 3): allow `sqlite3` in the policy + audit hook limited to `:memory:`,
-   then SQL / SQLAlchemy / N+1 games.
+3. Data Vaults topic 2: SQLAlchemy models + the N+1 problem (Pyodide wheel 2.0.48; pin it in
+   `harness/requirements.txt`).
 4. Phase 3 and 4 (owner will pick).
 
 ## 2026-09-26 — Session 3: Full Stack City (tracks + interest)

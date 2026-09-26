@@ -45,7 +45,10 @@ _BLOCKED_EVENTS = (
     "ftplib.",
     "smtplib.",
     "webbrowser.",
+    "sqlite3.enable_load_extension",
+    "sqlite3.load_extension",
 )
+
 TIMEOUT_EXIT = 124
 MAX_OUTPUT_BYTES = 256_000
 
@@ -53,6 +56,10 @@ MAX_OUTPUT_BYTES = 256_000
 def _audit(event: str, args: tuple[Any, ...]) -> None:
     if event.startswith(_BLOCKED_EVENTS):
         raise PermissionError(f"Blocked by sandbox: {event}")
+    # Data Vaults games use sqlite3 in memory only (harness/vault.py also blocks ATTACH).
+    # This fires for every connection, sqlite3.Connection(...) included, before it opens.
+    if event == "sqlite3.connect" and str(args[0] if args else "") not in (":memory:", ""):
+        raise PermissionError("Blocked by sandbox: only in-memory databases (':memory:')")
     if event == "open":
         mode = args[1] if len(args) > 1 else "r"
         if isinstance(mode, str) and any(c in mode for c in "wax+"):
@@ -71,6 +78,8 @@ def _on_alarm(_signum: int, _frame: object) -> None:
 
 def _preimport() -> None:
     """Import everything a game may need BEFORE locking down."""
+    import sqlite3  # noqa: F401 — Data Vaults games
+
     import fastapi  # noqa: F401
     import pydantic  # noqa: F401
 

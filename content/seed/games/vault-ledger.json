@@ -1,0 +1,213 @@
+{
+  "slug": "vault-ledger",
+  "game_type": "sql_query",
+  "title": "Vault Ledger",
+  "character": "librarian",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The ledger desk builds its SQL by pasting the visitor's text into the query. Glitch noticed.",
+    "goal": "Report a vault's items above `min_price`, priciest first, with count and total; 404 for unknown vaults; parameters only."
+  },
+  "objective": "Correct ledgers for every vault, and no way to trick the query.",
+  "rules": [
+    "Items in `vault` with `price >= min_price` (default 0), priciest first.",
+    "Answer `count`, `total` (sum of prices) and `items` (names).",
+    "A vault that doesn't exist answers 404.",
+    "Values go in `?` parameters, never pasted into the SQL."
+  ],
+  "variant_params": {
+    "gem": [
+      "Moonstone",
+      "Sunstone"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, HTTPException\nfrom harness.vault import open_vault\n\n# The vault: an in-memory SQLite database (tables vaults and items, see SCHEMA)\nSCHEMA = \"\"\"\nCREATE TABLE vaults (name TEXT PRIMARY KEY, floor INTEGER, keeper TEXT);\nINSERT INTO vaults VALUES ('North', 1, 'Ada'), ('South', 2, 'Grace'), ('Deep', -1, 'Linus');\nCREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, vault TEXT, price INTEGER);\nINSERT INTO items VALUES\n  (1, 'Crown', 'North', 950), (2, 'Map', 'North', 12), (3, 'Lantern', 'North', 40),\n  (4, 'Key', 'South', 25), (5, 'Ledger', 'South', 60),\n  (6, '{{gem}}', 'Deep', 700), (7, 'Rope', 'Deep', 8);\n\"\"\"\ndb = open_vault(SCHEMA)\napp = FastAPI()\n\n\n@app.get(\"/ledger\")\nasync def ledger(vault: str, min_price: int = 0) -> dict[str, object]:\n    # >>> EDIT START\n    rows = db.execute(f\"SELECT name, price FROM items WHERE vault = '{vault}'\").fetchall()\n    return {\"count\": len(rows), \"total\": sum(p for _, p in rows), \"items\": [n for n, _ in rows]}\n    # <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "North ledger",
+      "request": {
+        "method": "GET",
+        "path": "/ledger",
+        "query": "vault=North"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "count": 3,
+        "total": 1002,
+        "items": [
+          "Crown",
+          "Lantern",
+          "Map"
+        ]
+      }
+    },
+    {
+      "name": "South over 30",
+      "request": {
+        "method": "GET",
+        "path": "/ledger",
+        "query": "vault=South&min_price=30"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "count": 1,
+        "total": 60,
+        "items": [
+          "Ledger"
+        ]
+      }
+    },
+    {
+      "name": "A vault that isn't there",
+      "request": {
+        "method": "GET",
+        "path": "/ledger",
+        "query": "vault=Nowhere"
+      },
+      "expect_status": 404
+    }
+  ],
+  "hidden_tests": {
+    "tests": [
+      {
+        "name": "Deep ledger",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=Deep"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 2,
+          "total": 708,
+          "items": [
+            "{{gem}}",
+            "Rope"
+          ]
+        }
+      },
+      {
+        "name": "Exactly the minimum",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=Deep&min_price=700"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 1,
+          "total": 700,
+          "items": [
+            "{{gem}}"
+          ]
+        }
+      },
+      {
+        "name": "One over the priciest",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=Deep&min_price=701"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 0,
+          "total": 0,
+          "items": []
+        }
+      },
+      {
+        "name": "North, crown only",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=North&min_price=950"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 1,
+          "total": 950,
+          "items": [
+            "Crown"
+          ]
+        }
+      },
+      {
+        "name": "South, all of it",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=South"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "count": 2,
+          "total": 85,
+          "items": [
+            "Ledger",
+            "Key"
+          ]
+        }
+      },
+      {
+        "name": "SQL injection attempt",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=North%27%20OR%20%271%27%3D%271"
+        },
+        "expect_status": 404
+      },
+      {
+        "name": "Names are case-sensitive",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=north"
+        },
+        "expect_status": 404
+      },
+      {
+        "name": "Injection through min_price",
+        "request": {
+          "method": "GET",
+          "path": "/ledger",
+          "query": "vault=North&min_price=0%20OR%201%3D1"
+        },
+        "expect_status": 422
+      },
+      {
+        "name": "No vault given",
+        "request": {
+          "method": "GET",
+          "path": "/ledger"
+        },
+        "expect_status": 422
+      }
+    ]
+  },
+  "reference_solution": "if db.execute(\"SELECT 1 FROM vaults WHERE name = ?\", (vault,)).fetchone() is None:\n    raise HTTPException(status_code=404, detail=\"No such vault\")\nrows = db.execute(\n    \"SELECT name, price FROM items WHERE vault = ? AND price >= ? ORDER BY price DESC\",\n    (vault, min_price),\n).fetchall()\nreturn {\"count\": len(rows), \"total\": sum(p for _, p in rows), \"items\": [n for n, _ in rows]}\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Three jobs: check the vault exists, filter and sort the items, and never paste the visitor's text into SQL."
+    },
+    {
+      "tier": 2,
+      "text": "SELECT 1 FROM vaults WHERE name = ? tells you if a vault exists (fetchone() is None if not). Two ?s take a two-item tuple: (vault, min_price)."
+    },
+    {
+      "tier": 3,
+      "text": "WHERE vault = ? AND price >= ? ORDER BY price DESC, with (vault, min_price); raise HTTPException(status_code=404) for an unknown vault first."
+    }
+  ],
+  "dialogue": {
+    "start": "Glitch typed a quote mark into the vault name and the whole ledger spilled out.",
+    "success": "Every ledger balances, and the quote-mark trick bounces off. Well kept.",
+    "fail": "Some ledgers are wrong, or the query can still be tricked."
+  }
+}
