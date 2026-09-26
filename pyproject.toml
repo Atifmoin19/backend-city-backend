@@ -1,6 +1,6 @@
 [project]
 name = "backend-city-backend"
-version = "1.8.0"
+version = "1.9.0"
 description = "Backend City API — FastAPI backend for the gamified backend-learning platform"
 readme = "README.md"
 requires-python = ">=3.13"
