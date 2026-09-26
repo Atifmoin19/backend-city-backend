@@ -15,6 +15,15 @@ class CheckpointProgress(BaseModel):
     passed_at: datetime | None
 
 
+class TopicGame(BaseModel):
+    """A live game in a topic, as learners see it listed (no answers, no tests)."""
+
+    slug: str
+    title: str
+    objective: str
+    is_checkpoint: bool
+
+
 class TopicProgressPublic(BaseModel):
     topic: str  # topic slug
     track: str  # track ("city") slug, e.g. python-backend
@@ -23,6 +32,7 @@ class TopicProgressPublic(BaseModel):
     lesson_done: bool
     practice_games: list[str]  # published practice game slugs, in play order
     checkpoint_game: str | None
+    games: list[TopicGame] = []  # live games in play order (titles for the district page)
     practice_passed: list[str]
     checkpoint: CheckpointProgress | None
     consecutive_fails: int  # checkpoint fails since the last pass (soft-fail help after 2)

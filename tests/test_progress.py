@@ -207,3 +207,25 @@ async def test_open_goal_is_not_an_interest(client: AsyncClient) -> None:
     await register(client)
     await client.put("/me/goal", json={"track": "python-backend"})
     assert (await client.get("/me/interests")).json() == {"tracks": []}
+
+
+async def test_progress_lists_live_games_with_titles_and_drops_hidden_ones(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    from tests.test_admin import admin
+
+    await admin(client, db)  # an admin can also read their own progress
+    tower = topic_of(await progress(client), "how-requests-travel")
+    assert [(g["slug"], g["is_checkpoint"]) for g in tower["games"]] == [
+        ("signal-codes", False),
+        ("method-lanes", False),
+        ("tower-relay", True),
+    ]
+    assert tower["games"][0]["title"] == "Signal Codes"
+    assert tower["games"][0]["objective"]
+
+    hidden = await client.patch("/admin/games/method-lanes", json={"status": "draft"})
+    assert hidden.status_code == 200, hidden.text
+    tower = topic_of(await progress(client), "how-requests-travel")
+    assert [g["slug"] for g in tower["games"]] == ["signal-codes", "tower-relay"]
+    assert tower["practice_games"] == ["signal-codes"]

@@ -24,6 +24,7 @@ from app.schemas.progress import (
     CheckpointProgress,
     ProgressImport,
     ProgressPublic,
+    TopicGame,
     TopicProgressPublic,
 )
 
@@ -68,9 +69,16 @@ class ProgressService:
         history: dict[uuid.UUID, list[tuple[bool, datetime]]] = {}
         for topic_id, passed, at in await self.repo.graded_checkpoints(user.id):
             history.setdefault(topic_id, []).append((passed, at))
+        titles = await self.content.live_titles()
         topics = [
             self._topic_view(
-                topic, track_slug, games, rows.get(topic.id), practice, history.get(topic.id, [])
+                topic,
+                track_slug,
+                games,
+                rows.get(topic.id),
+                practice,
+                history.get(topic.id, []),
+                titles,
             )
             for topic, track_slug, games in await self.content.topics_with_games(track)
             if topic.status == ContentStatus.PUBLISHED
@@ -82,7 +90,8 @@ class ProgressService:
         row = await self.repo.all_topic_progress(user.id)
         history = [(p, at) for _, p, at in await self.repo.graded_checkpoints(user.id, topic.id)]
         practice = await self.repo.practice_passed_slugs(user.id)
-        return self._topic_view(topic, track, games, row.get(topic.id), practice, history)
+        titles = await self.content.live_titles()
+        return self._topic_view(topic, track, games, row.get(topic.id), practice, history, titles)
 
     async def _placement(self, topic: Topic) -> tuple[str, list[Game]]:
         for t, track, games in await self.content.topics_with_games():
@@ -98,6 +107,7 @@ class ProgressService:
         row: TopicProgress | None,
         practice: set[str],
         history: list[tuple[bool, datetime]],
+        titles: dict[uuid.UUID, tuple[str, str]],
     ) -> TopicProgressPublic:
         live = _published(games)
         practice_games = [g.slug for g in live if not g.is_checkpoint]
@@ -129,6 +139,18 @@ class ProgressService:
             lesson_done=lesson_done,
             practice_games=practice_games,
             checkpoint_game=checkpoint_game,
+            games=[
+                TopicGame(
+                    slug=g.slug,
+                    title=titles.get(g.id, (g.slug, ""))[0],
+                    objective=titles.get(g.id, ("", ""))[1],
+                    is_checkpoint=g.is_checkpoint,
+                )
+                for g in [
+                    *(g for g in live if not g.is_checkpoint),
+                    *(g for g in live if g.is_checkpoint),
+                ]
+            ],
             practice_passed=[s for s in practice_games if s in practice],
             checkpoint=checkpoint,
             consecutive_fails=fails,

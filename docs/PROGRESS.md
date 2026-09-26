@@ -38,8 +38,8 @@ Running log. Newest entry on top. Update at the end of every task.
 
 ### Next up (owner decides)
 1. ~~Email flows~~ done in v1.12.0 (EmailJS keys still to be set on Render).
-2. Admin: create games/topics from the panel, audit log; serve the topic → game list to the
-   frontend.
+2. Admin: create games/topics from the panel, audit log (the topic → game list is served
+   since v1.12.1: `TopicProgress.games`).
 3. Data Vaults (Level 3): allow `sqlite3` in the policy + audit hook limited to `:memory:`,
    then SQL / SQLAlchemy / N+1 games.
 4. Phase 3 and 4 (owner will pick).
@@ -93,8 +93,6 @@ Running log. Newest entry on top. Update at the end of every task.
 5. Phase 2: AI hints (Byte), XP/streaks/badges, Data Vaults.
 
 ### Known issues
-- The frontend's topic → game list is static (`src/content/topics.ts`); a game an admin hides
-  still shows as a step (it then 404s). Creating games from the admin is not built yet.
 
 ## 2026-09-26 — Session 1d: hardening
 

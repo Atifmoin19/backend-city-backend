@@ -101,7 +101,7 @@ Hidden test details are never returned, only counts. `score = raw_score − hint
 
 ## Progress (login required)
 `TopicProgress = { topic, track, status: "locked"|"unlocked"|"passed", complete, lesson_done,
-practice_games: [slug], checkpoint_game: slug|null, practice_passed: [slug],
+practice_games: [slug], checkpoint_game: slug|null, games: [{ slug, title, objective, is_checkpoint }] (live, play order), practice_passed: [slug],
 checkpoint: { best_score, stars, attempts, passed, passed_at } | null, consecutive_fails, retry_at }`
 
 A topic is complete when its checkpoint is passed, or (lesson-only topic) its briefing is done.

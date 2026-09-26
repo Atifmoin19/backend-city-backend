@@ -56,6 +56,15 @@ class ContentRepository:
         )
         return int(result.scalar_one()) + 1
 
+    async def live_titles(self) -> dict[uuid.UUID, tuple[str, str]]:
+        """Game id → (title, objective) of each game's live version."""
+        rows = await self.session.execute(
+            select(Game.id, GameVersion.title, GameVersion.objective).join(
+                GameVersion, GameVersion.id == Game.current_version_id
+            )
+        )
+        return {gid: (title, objective or "") for gid, title, objective in rows}
+
     async def topic_by_slug(self, slug: str) -> Topic | None:
         result = await self.session.execute(select(Topic).where(Topic.slug == slug))
         return result.scalars().first()
