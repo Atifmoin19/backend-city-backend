@@ -22,6 +22,7 @@ import select
 import signal
 import sys
 import time
+from dataclasses import dataclass, field
 from typing import Any
 
 _BLOCKED_EVENTS = (
@@ -160,38 +161,26 @@ def _child(job: dict[str, Any], result_fd: int) -> None:  # pragma: no cover —
     os._exit(code)
 
 
-def _collect(pid: int, fd: int, wall_seconds: float) -> tuple[str, Any]:
-    """Wait for one child: its report, or why there is none."""
-    deadline = time.monotonic() + wall_seconds
-    chunks: list[bytes] = []
-    size = 0
-    killed = ""
-    while True:
-        left = deadline - time.monotonic()
-        if left <= 0:
-            killed = "timeout"
-            break
-        ready, _, _ = select.select([fd], [], [], left)
-        if not ready:
-            continue
-        chunk = os.read(fd, 65536)
-        if not chunk:
-            break
-        size += len(chunk)
-        if size > MAX_OUTPUT_BYTES:
-            killed = "crashed"
-            break
-        chunks.append(chunk)
-    if killed:
-        # OSError, not just ProcessLookupError: macOS answers EPERM for an already-dead group
-        with contextlib.suppress(OSError):
-            os.killpg(pid, signal.SIGKILL)
-        with contextlib.suppress(OSError):
-            os.kill(pid, signal.SIGKILL)
-    os.close(fd)
-    _, status = os.waitpid(pid, 0)
-    if killed:
-        return killed, None
+@dataclass
+class _Running:
+    """One forked child the server is waiting on."""
+
+    job_id: object
+    pid: int
+    deadline: float
+    chunks: list[bytes] = field(default_factory=list)
+    size: int = 0
+
+
+def _kill_group(pid: int) -> None:
+    # OSError, not just ProcessLookupError: macOS answers EPERM for an already-dead group
+    with contextlib.suppress(OSError):
+        os.killpg(pid, signal.SIGKILL)
+    with contextlib.suppress(OSError):
+        os.kill(pid, signal.SIGKILL)
+
+
+def _outcome(status: int, chunks: list[bytes]) -> tuple[str, Any]:
     exit_code = os.waitstatus_to_exitcode(status)
     # Out of CPU (RLIMIT_CPU sends SIGXCPU, then SIGKILL at the hard limit) is a timeout too
     if exit_code in (TIMEOUT_EXIT, -signal.SIGXCPU, -signal.SIGKILL):
@@ -204,30 +193,92 @@ def _collect(pid: int, fd: int, wall_seconds: float) -> tuple[str, Any]:
         return "crashed", None
 
 
-def serve() -> None:
+def _start(job: dict[str, Any]) -> tuple[int, _Running]:
+    read_fd, write_fd = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        os.close(read_fd)
+        _child(job, write_fd)
+    os.close(write_fd)
+    wall = float(job.get("timeout", 4)) + 1.0
+    return read_fd, _Running(job.get("id"), pid, time.monotonic() + wall)
+
+
+def serve(parallel: int = 1) -> None:
+    """Read job lines on stdin; run up to `parallel` children at once; answer each with its
+    id as soon as it finishes (replies can come out of order). Single-threaded on purpose:
+    forking from a threaded process is unsafe, so one select() loop watches stdin and every
+    child's result pipe, and enforces each child's deadline."""
     _preimport()
     out = sys.stdout
     out.write(json.dumps({"ready": True}) + "\n")
     out.flush()
-    for line in sys.stdin:
-        job = json.loads(line)
-        read_fd, write_fd = os.pipe()
-        pid = os.fork()
-        if pid == 0:
-            os.close(read_fd)
-            _child(job, write_fd)
-        os.close(write_fd)
-        try:
-            outcome, report = _collect(pid, read_fd, float(job.get("timeout", 4)) + 1.0)
-        except Exception:  # one bad job must never take the server down
-            outcome, report = "crashed", None
-        out.write(json.dumps({"id": job["id"], "outcome": outcome, "report": report}) + "\n")
+    stdin = sys.stdin.fileno()
+    buffer = b""
+    waiting: list[dict[str, Any]] = []
+    running: dict[int, _Running] = {}
+    stdin_open = True
+
+    def reply(job_id: object, outcome: str, report: Any) -> None:
+        out.write(json.dumps({"id": job_id, "outcome": outcome, "report": report}) + "\n")
         out.flush()
+
+    def finish(fd: int, killed: str = "") -> None:
+        run = running.pop(fd)
+        if killed:
+            _kill_group(run.pid)
+        os.close(fd)
+        _, status = os.waitpid(run.pid, 0)
+        outcome, report = (killed, None) if killed else _outcome(status, run.chunks)
+        reply(run.job_id, outcome, report)
+
+    while stdin_open or running or waiting:
+        while waiting and len(running) < parallel:
+            job = waiting.pop(0)
+            try:
+                fd, run = _start(job)
+                running[fd] = run
+            except Exception:  # one bad job must never take the server down
+                reply(job.get("id"), "crashed", None)
+        now = time.monotonic()
+        timeout = max(0.0, min(r.deadline for r in running.values()) - now) if running else None
+        ready, _, _ = select.select(
+            ([stdin] if stdin_open else []) + list(running), [], [], timeout
+        )
+        for fd in ready:
+            if fd == stdin:
+                chunk = os.read(stdin, 65536)
+                if not chunk:
+                    stdin_open = False
+                    continue
+                buffer += chunk
+                while b"\n" in buffer:
+                    line, buffer = buffer.split(b"\n", 1)
+                    if line.strip():
+                        try:
+                            waiting.append(json.loads(line))
+                        except ValueError:
+                            reply(None, "crashed", None)
+                continue
+            run = running[fd]
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                finish(fd)
+                continue
+            run.size += len(chunk)
+            if run.size > MAX_OUTPUT_BYTES:
+                finish(fd, killed="crashed")
+            else:
+                run.chunks.append(chunk)
+        now = time.monotonic()
+        for fd in [fd for fd, r in running.items() if r.deadline <= now]:
+            finish(fd, killed="timeout")
 
 
 if __name__ == "__main__":
     sys.path.insert(0, sys.argv[1])
     if "--serve" in sys.argv[2:]:
-        serve()
+        flags = [a for a in sys.argv[2:] if a.startswith("--parallel=")]
+        serve(max(1, int(flags[-1].split("=", 1)[1])) if flags else 1)
     else:
         main_once()

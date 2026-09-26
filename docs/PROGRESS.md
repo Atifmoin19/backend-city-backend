@@ -19,10 +19,12 @@ Running log. Newest entry on top. Update at the end of every task.
 - **XP, levels, streaks, badges**: `GET /me/stats` derives them from existing records (so past
   work counts; nothing new is stored). 11 badges with earned dates; lesson-only topics never
   count as checkpoint passes.
+- **Parallel warm sandbox**: the fork server runs `SANDBOX_PARALLEL` (default 2) grades at once;
+  replies are matched by job id. Verified in the Linux image (memory test included).
 - Spike (PGlite vs sql.js): neither. Data Vaults games use Python `sqlite3` inside the harness
   (0 extra download, same engine in browser and grader); numbers + sandbox caveats in
   ARCHITECTURE.md "Key decisions".
-- API title is now "Full Stack City API". 181 tests pass.
+- API title is now "Full Stack City API". 183 tests pass.
 
 ## 2026-09-26 — Session 3: Full Stack City (tracks + interest)
 
@@ -75,7 +77,6 @@ Running log. Newest entry on top. Update at the end of every task.
 ### Known issues
 - The frontend's topic → game list is static (`src/content/topics.ts`); a game an admin hides
   still shows as a step (it then 404s). Creating games from the admin is not built yet.
-- Warm sandbox handles one grade at a time (fine at current traffic; ~1 s each).
 
 ## 2026-09-26 — Session 1d: hardening
 

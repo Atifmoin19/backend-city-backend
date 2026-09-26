@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     # Keep a pre-imported fork server running so a grade doesn't pay interpreter start +
     # FastAPI imports (7-11 s on Render's 0.1 CPU). Falls back to cold runs if it can't start.
     sandbox_warm: bool = True
+    # grades the warm fork server runs at once (each is a forked child: little extra memory)
+    sandbox_parallel: int = 2
     # Interpreter for the grading sandbox (venv built from harness/requirements.txt).
     # Empty = current interpreter (fine for local dev/tests).
     sandbox_python: str = ""

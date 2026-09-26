@@ -82,6 +82,13 @@ in Docker at `--cpus=0.1`: 11 s cold → ~0.7 s warm. Started at app startup (li
 Known limit: no kernel-level network namespace on Render free tier. Audit hook + allowlist cover
 it for now; if abuse appears, move grading to an isolated worker (ideology §11.3).
 
+Parallel grading (2026-09-26): the server is one `select()` loop over stdin and every child's
+result pipe, running up to `SANDBOX_PARALLEL` (default 2) children at once with a deadline
+each; replies carry the job id and may arrive out of order. It stays single-threaded because
+forking from a threaded process is unsafe. The API side caps jobs in flight at the same number
+(so queueing never eats a job's timeout) and a reader task routes each reply to its caller. A
+runaway grade no longer holds up the next learner.
+
 ## Key decisions
 - **Real FastAPI in Pyodide** (Phase 0 spike): viable — ~0.13 ms/request in-process, ~2.2 MB gz
   extra download. No mini-framework needed.

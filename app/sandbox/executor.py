@@ -178,21 +178,32 @@ class WarmUnavailableError(RuntimeError):
 
 
 class WarmSandbox:
-    """Client for the fork server (entry.py --serve). One job at a time; restarts on failure."""
+    """Client for the fork server (entry.py --serve). Up to `sandbox_parallel` jobs run at
+    once; one reader task hands each reply (tagged with its job id) to the waiting caller.
+    The server is restarted when it dies or stops answering."""
 
     def __init__(self) -> None:
         self._proc: asyncio.subprocess.Process | None = None
-        self._lock: asyncio.Lock | None = None
+        self._lock: asyncio.Lock | None = None  # guards start-up and writes to stdin
+        self._slots: asyncio.Semaphore | None = None  # jobs in flight <= server parallelism
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._reader: asyncio.Task[None] | None = None
+        self._pending: dict[int, asyncio.Future[tuple[str, Any]]] = {}
         self._jobs = 0
         self._workdir = tempfile.mkdtemp(prefix="bc-warm-")
 
-    def _bind(self) -> asyncio.Lock:
-        """The process and lock belong to one event loop (tests may use several)."""
+    @staticmethod
+    def _parallel() -> int:
+        return max(1, get_settings().sandbox_parallel)
+
+    def _bind(self) -> tuple[asyncio.Lock, asyncio.Semaphore]:
+        """The process, lock and reader belong to one event loop (tests may use several)."""
         loop = asyncio.get_running_loop()
-        if self._loop is not loop or self._lock is None:
-            self._loop, self._lock, self._proc = loop, asyncio.Lock(), None
-        return self._lock
+        if self._loop is not loop or self._lock is None or self._slots is None:
+            self._loop, self._proc, self._reader = loop, None, None
+            self._lock, self._slots = asyncio.Lock(), asyncio.Semaphore(self._parallel())
+            self._pending = {}
+        return self._lock, self._slots
 
     async def _start(self, startup_seconds: float) -> asyncio.subprocess.Process:
         try:
@@ -203,6 +214,7 @@ class WarmSandbox:
                 str(ENTRY),
                 str(BACKEND_ROOT),
                 "--serve",
+                f"--parallel={self._parallel()}",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -216,7 +228,26 @@ class WarmSandbox:
                 raise WarmUnavailableError("fork server did not report ready")
         except (OSError, TimeoutError, ValueError) as exc:
             raise WarmUnavailableError(str(exc)) from exc
+        self._reader = asyncio.create_task(self._read_replies(proc))
         return proc
+
+    async def _read_replies(self, proc: asyncio.subprocess.Process) -> None:
+        assert proc.stdout is not None  # noqa: S101
+        try:
+            while line := await proc.stdout.readline():
+                reply = json.loads(line)
+                fut = self._pending.pop(reply.get("id"), None)
+                if fut is not None and not fut.done():
+                    fut.set_result((str(reply["outcome"]), reply.get("report")))
+        except (OSError, ValueError, asyncio.LimitOverrunError):
+            pass
+        # the server is gone (or spoke nonsense): every job still waiting has crashed
+        if self._proc is proc:
+            self._proc = None
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_result(("crashed", None))
+        self._pending.clear()
 
     async def _kill(self) -> None:
         proc, self._proc = self._proc, None
@@ -226,33 +257,40 @@ class WarmSandbox:
             await proc.wait()
 
     async def run(self, job: dict[str, Any], limits: SandboxLimits) -> tuple[str, Any]:
-        async with self._bind():
-            if self._proc is None or self._proc.returncode is not None:
-                self._proc = await self._start(limits.startup_seconds)
-            proc = self._proc
-            assert proc.stdin is not None and proc.stdout is not None  # noqa: S101
-            self._jobs += 1
-            job_id = self._jobs
+        lock, slots = self._bind()
+        async with slots:
+            async with lock:
+                if self._proc is None or self._proc.returncode is not None:
+                    self._proc = await self._start(limits.startup_seconds)
+                proc = self._proc
+                assert proc.stdin is not None  # noqa: S101
+                self._jobs += 1
+                job_id = self._jobs
+                fut: asyncio.Future[tuple[str, Any]] = asyncio.get_running_loop().create_future()
+                self._pending[job_id] = fut
+                try:
+                    proc.stdin.write(json.dumps({**job, "id": job_id}).encode() + b"\n")
+                    await proc.stdin.drain()
+                except OSError:
+                    self._pending.pop(job_id, None)
+                    await self._kill()
+                    return "crashed", None
             try:
-                proc.stdin.write(json.dumps({**job, "id": job_id}).encode() + b"\n")
-                await proc.stdin.drain()
                 # the server kills the child after timeout + 1 s; allow a margin on top
-                line = await asyncio.wait_for(
-                    proc.stdout.readline(), timeout=limits.timeout_seconds + 5
-                )
-                reply = json.loads(line)
-            except (TimeoutError, OSError, ValueError, asyncio.LimitOverrunError):
-                await self._kill()
+                return await asyncio.wait_for(fut, timeout=limits.timeout_seconds + 5)
+            except TimeoutError:
+                # the server itself stopped answering: restart it (other jobs fail with it)
+                self._pending.pop(job_id, None)
+                async with lock:
+                    if self._proc is proc:
+                        await self._kill()
                 return "crashed", None
-            if reply.get("id") != job_id:
-                await self._kill()
-                return "crashed", None
-            return str(reply["outcome"]), reply.get("report")
 
     async def warm_up(self) -> None:
         """Start the server ahead of the first grade (called at app startup)."""
         settings = get_settings()
-        async with self._bind():
+        lock, _ = self._bind()
+        async with lock:
             if self._proc is None:
                 self._proc = await self._start(settings.sandbox_startup_seconds)
 

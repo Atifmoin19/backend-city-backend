@@ -208,3 +208,42 @@ async def test_warm_engine_is_fast_after_the_first_grade() -> None:
         result = await execute(src, tests, LIMITS)
         assert result.report is not None and result.report["results"][0]["passed"]
     assert (time.monotonic() - start) / 3 < 1.0
+
+
+async def test_warm_engine_grades_in_parallel_and_matches_replies() -> None:
+    """Several grades at once: each caller gets its own report back, in any order."""
+    import asyncio
+
+    settings = get_settings()
+    settings.sandbox_warm = True
+    src = (
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "@app.get('/n')\n"
+        "async def n() -> dict[str, int]:\n"
+        "    return {'n': N}\n"
+    )
+    tests = [{"name": "n", "request": {"method": "GET", "path": "/n"}, "expect_status": 200}]
+    results = await asyncio.gather(
+        *(execute(src.replace("N", str(i)), tests, LIMITS) for i in range(6))
+    )
+    bodies = [r.report["results"][0]["body"] for r in results if r.report is not None]
+    assert bodies == [{"n": i} for i in range(6)]
+
+
+async def test_a_runaway_grade_does_not_hold_up_a_quick_one() -> None:
+    import asyncio
+    import time
+
+    settings = get_settings()
+    settings.sandbox_warm = True
+    quick_src = "from fastapi import FastAPI\napp = FastAPI()\n"
+    tests = [{"name": "t", "request": {"method": "GET", "path": "/"}, "expect_status": 404}]
+    await execute(quick_src, tests, LIMITS)  # server up
+    slow = asyncio.create_task(execute("while True:\n    pass\n", [], SandboxLimits(2.0, 256)))
+    await asyncio.sleep(0.2)
+    start = time.monotonic()
+    quick = await execute(quick_src, tests, LIMITS)
+    assert quick.report is not None and quick.report["results"][0]["passed"]
+    assert time.monotonic() - start < 1.5  # did not wait for the 2 s loop
+    assert (await slow).timed_out
