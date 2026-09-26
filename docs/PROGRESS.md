@@ -17,6 +17,12 @@ Running log. Newest entry on top. Update at the end of every task.
   vault-ledger (checkpoint, SQL-injection hidden test). 226 tests pass.
   Residual risk (documented): a policy escape could only open existing SQLite files or create
   empty ones; writes are capped at 0 bytes by RLIMIT_FSIZE.
+- **Data Vaults topic 2** (v1.14.0): `write-the-vault` in new chapter `sql-writes` with
+  stock-room (INSERT, `lastrowid`, 404), vault-census (GROUP BY, LEFT JOIN, HAVING) and
+  vault-transfer (checkpoint: `with db:` transaction, CHECK constraint → `IntegrityError` →
+  409, `rowcount` → 404; hidden tests check nothing is half done and a `'--` trick). Harness
+  0.3.1 re-exports `IntegrityError` (learners still can't import sqlite3). References pass in
+  the Linux sandbox; 244 tests pass.
 
 ## 2026-09-26 — Session 4: Academy games, quizzes, rewards, analytics, parallel sandbox
 

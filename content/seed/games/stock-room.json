@@ -1,0 +1,135 @@
+{
+  "slug": "stock-room",
+  "game_type": "sql_query",
+  "title": "Stock Room",
+  "character": "librarian",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "New stock arrives at the vault door. The clerk writes it in by pasting names into SQL, and a captain's log just crashed the desk.",
+    "goal": "Add items with an `INSERT` and `?` parameters, answer the new id, and refuse vaults that don't exist."
+  },
+  "objective": "Every delivery is shelved, apostrophes and all, and nothing lands in a vault that isn't there.",
+  "rules": [
+    "Insert the item with `?` parameters (a name may contain a `'`).",
+    "Answer `201` with the new `id` (`cur.lastrowid`) and the `name`.",
+    "A vault that doesn't exist answers `404`, and nothing is added."
+  ],
+  "variant_params": {
+    "gem": [
+      "Moonstone",
+      "Sunstone"
+    ],
+    "tool": [
+      "Compass",
+      "Sextant"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel, Field\nfrom harness.vault import open_vault\n\n# The vault: an in-memory SQLite database (tables vaults and items, see SCHEMA)\nSCHEMA = \"\"\"\nCREATE TABLE vaults (name TEXT PRIMARY KEY, floor INTEGER, keeper TEXT);\nINSERT INTO vaults VALUES ('North', 1, 'Ada'), ('South', 2, 'Grace'), ('Deep', -1, 'Linus');\nCREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, vault TEXT, price INTEGER);\nINSERT INTO items VALUES\n  (1, 'Crown', 'North', 950), (2, 'Map', 'North', 12), (3, 'Lantern', 'North', 40),\n  (4, 'Key', 'South', 25), (5, 'Ledger', 'South', 60),\n  (6, '{{gem}}', 'Deep', 700), (7, 'Rope', 'Deep', 8);\n\"\"\"\ndb = open_vault(SCHEMA)\napp = FastAPI()\n\n\nclass NewItem(BaseModel):\n    name: str = Field(min_length=1)\n    vault: str\n    price: int = Field(ge=0)\n\n\n@app.get(\"/items/{item_id}\")\nasync def get_item(item_id: int) -> dict[str, object]:\n    row = db.execute(\"SELECT id, name, vault, price FROM items WHERE id = ?\", (item_id,)).fetchone()\n    if row is None:\n        raise HTTPException(status_code=404, detail=\"No such item\")\n    return {\"id\": row[0], \"name\": row[1], \"vault\": row[2], \"price\": row[3]}\n\n\n@app.post(\"/items\", status_code=201)\nasync def add_item(body: NewItem) -> dict[str, object]:\n    # >>> EDIT START\n    cur = db.execute(\n        f\"INSERT INTO items (name, vault, price) VALUES ('{body.name}', '{body.vault}', {body.price})\"\n    )\n    return {\"id\": cur.lastrowid, \"name\": body.name}\n    # <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Shelve a {{tool}}",
+      "request": {
+        "method": "POST",
+        "path": "/items",
+        "json": {
+          "name": "{{tool}}",
+          "vault": "North",
+          "price": 30
+        }
+      },
+      "expect_status": 201,
+      "expect_body": {
+        "id": 8,
+        "name": "{{tool}}"
+      }
+    },
+    {
+      "name": "It's on the shelf",
+      "request": {
+        "method": "GET",
+        "path": "/items/8"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "name": "{{tool}}",
+        "vault": "North",
+        "price": 30
+      }
+    },
+    {
+      "name": "A name with an apostrophe",
+      "request": {
+        "method": "POST",
+        "path": "/items",
+        "json": {
+          "name": "Captain's Log",
+          "vault": "South",
+          "price": 45
+        }
+      },
+      "expect_status": 201,
+      "expect_body": {
+        "id": 9,
+        "name": "Captain's Log"
+      }
+    },
+    {
+      "name": "The log is on the shelf",
+      "request": {
+        "method": "GET",
+        "path": "/items/9"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "name": "Captain's Log",
+        "vault": "South"
+      }
+    },
+    {
+      "name": "A vault that isn't there",
+      "request": {
+        "method": "POST",
+        "path": "/items",
+        "json": {
+          "name": "Anchor",
+          "vault": "Nowhere",
+          "price": 5
+        }
+      },
+      "expect_status": 404
+    },
+    {
+      "name": "Nothing was added",
+      "request": {
+        "method": "GET",
+        "path": "/items/10"
+      },
+      "expect_status": 404
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "if db.execute(\"SELECT 1 FROM vaults WHERE name = ?\", (body.vault,)).fetchone() is None:\n    raise HTTPException(status_code=404, detail=\"No such vault\")\nwith db:\n    cur = db.execute(\n        \"INSERT INTO items (name, vault, price) VALUES (?, ?, ?)\",\n        (body.name, body.vault, body.price),\n    )\nreturn {\"id\": cur.lastrowid, \"name\": body.name}\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Two jobs: check the vault exists before inserting, and never paste the name into the SQL (the ' in Captain's Log ends the string early)."
+    },
+    {
+      "tier": 2,
+      "text": "INSERT INTO items (name, vault, price) VALUES (?, ?, ?) with a three-item tuple. SELECT 1 FROM vaults WHERE name = ? finds the vault; fetchone() is None when it's missing."
+    },
+    {
+      "tier": 3,
+      "text": "Raise HTTPException(status_code=404) when the vault is missing, then run the INSERT inside `with db:` and return {\"id\": cur.lastrowid, \"name\": body.name}."
+    }
+  ],
+  "dialogue": {
+    "start": "One apostrophe and the whole stock desk fell over. Let's shelve things properly.",
+    "success": "Every box on its shelf, even the captain's. And no deliveries to imaginary vaults.",
+    "fail": "Some deliveries crashed the desk or went to a vault that isn't there."
+  }
+}

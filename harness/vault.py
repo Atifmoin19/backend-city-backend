@@ -9,6 +9,10 @@ import sqlite3
 
 _BLOCKED = (sqlite3.SQLITE_ATTACH, sqlite3.SQLITE_DETACH)
 
+# Raised when a write breaks a table rule (CHECK, UNIQUE, NOT NULL). Re-exported so game
+# code can catch it: learner snippets may not import sqlite3 themselves.
+IntegrityError = sqlite3.IntegrityError
+
 
 def _guard(action: int, *_: object) -> int:
     return sqlite3.SQLITE_DENY if action in _BLOCKED else sqlite3.SQLITE_OK

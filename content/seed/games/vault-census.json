@@ -1,0 +1,146 @@
+{
+  "slug": "vault-census",
+  "game_type": "sql_query",
+  "title": "Vault Census",
+  "character": "librarian",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The Librarian wants a headcount of every vault, floor by floor. The new Attic keeps going missing from the report.",
+    "goal": "One query: `GROUP BY` each vault with its item count and total, keep empty vaults with `LEFT JOIN`, and filter with `HAVING`."
+  },
+  "objective": "A census of every vault, lowest floor first, empty ones included.",
+  "rules": [
+    "One row per vault: `name`, `items` (how many) and `total` (sum of prices, `0` when empty).",
+    "Every vault appears, even one with no items, lowest `floor` first.",
+    "Only vaults with at least `min_items` items (default 0).",
+    "One query for the whole census, not one per vault."
+  ],
+  "variant_params": {
+    "gem": [
+      "Moonstone",
+      "Sunstone"
+    ],
+    "keeper": [
+      "Rosa",
+      "Kai"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI\nfrom harness.vault import open_vault\n\n# The vault: an in-memory SQLite database (tables vaults and items, see SCHEMA).\n# The Attic is new: it has no items yet.\nSCHEMA = \"\"\"\nCREATE TABLE vaults (name TEXT PRIMARY KEY, floor INTEGER, keeper TEXT);\nINSERT INTO vaults VALUES ('North', 1, 'Ada'), ('South', 2, 'Grace'), ('Deep', -1, 'Linus'),\n  ('Attic', 3, '{{keeper}}');\nCREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, vault TEXT, price INTEGER);\nINSERT INTO items VALUES\n  (1, 'Crown', 'North', 950), (2, 'Map', 'North', 12), (3, 'Lantern', 'North', 40),\n  (4, 'Key', 'South', 25), (5, 'Ledger', 'South', 60),\n  (6, '{{gem}}', 'Deep', 700), (7, 'Rope', 'Deep', 8);\n\"\"\"\ndb = open_vault(SCHEMA)\napp = FastAPI()\n\n\n@app.get(\"/census\")\nasync def census(min_items: int = 0) -> dict[str, list[dict[str, object]]]:\n    # >>> EDIT START\n    rows = db.execute(\n        \"SELECT v.name, COUNT(*), SUM(i.price) FROM vaults v JOIN items i ON i.vault = v.name \"\n        \"GROUP BY v.name\"\n    ).fetchall()\n    # <<< EDIT END\n    return {\"vaults\": [{\"name\": n, \"items\": c, \"total\": s} for n, c, s in rows]}\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "The whole census",
+      "request": {
+        "method": "GET",
+        "path": "/census"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "vaults": [
+          {
+            "name": "Deep",
+            "items": 2,
+            "total": 708
+          },
+          {
+            "name": "North",
+            "items": 3,
+            "total": 1002
+          },
+          {
+            "name": "South",
+            "items": 2,
+            "total": 85
+          },
+          {
+            "name": "Attic",
+            "items": 0,
+            "total": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "At least one item",
+      "request": {
+        "method": "GET",
+        "path": "/census",
+        "query": "min_items=1"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "vaults": [
+          {
+            "name": "Deep",
+            "items": 2,
+            "total": 708
+          },
+          {
+            "name": "North",
+            "items": 3,
+            "total": 1002
+          },
+          {
+            "name": "South",
+            "items": 2,
+            "total": 85
+          }
+        ]
+      }
+    },
+    {
+      "name": "At least three items",
+      "request": {
+        "method": "GET",
+        "path": "/census",
+        "query": "min_items=3"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "vaults": [
+          {
+            "name": "North",
+            "items": 3,
+            "total": 1002
+          }
+        ]
+      }
+    },
+    {
+      "name": "Nobody has five",
+      "request": {
+        "method": "GET",
+        "path": "/census",
+        "query": "min_items=5"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "vaults": []
+      }
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "rows = db.execute(\n    \"SELECT v.name, COUNT(i.id), COALESCE(SUM(i.price), 0) FROM vaults v \"\n    \"LEFT JOIN items i ON i.vault = v.name \"\n    \"GROUP BY v.name HAVING COUNT(i.id) >= ? ORDER BY v.floor\",\n    (min_items,),\n).fetchall()\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "A plain JOIN drops vaults with no matching items. LEFT JOIN keeps every vault and fills the item columns with NULL."
+    },
+    {
+      "tier": 2,
+      "text": "COUNT(i.id) counts only real items (NULLs don't count); COALESCE(SUM(i.price), 0) turns an empty sum into 0. HAVING filters groups, WHERE filters rows."
+    },
+    {
+      "tier": 3,
+      "text": "... LEFT JOIN items i ON i.vault = v.name GROUP BY v.name HAVING COUNT(i.id) >= ? ORDER BY v.floor, with (min_items,)."
+    }
+  ],
+  "dialogue": {
+    "start": "Count every vault for me. Yes, the empty Attic too. Especially the Attic.",
+    "success": "Every floor counted, in one trip to the shelves. Tidy work.",
+    "fail": "The census is missing a vault, or the counts don't add up."
+  }
+}

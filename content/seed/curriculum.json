@@ -109,6 +109,21 @@
               "checkpoint": "vault-ledger"
             }
           ]
+        },
+        {
+          "slug": "sql-writes",
+          "title": "Changing data safely",
+          "topics": [
+            {
+              "slug": "write-the-vault",
+              "title": "Change the vault safely",
+              "practice": [
+                "stock-room",
+                "vault-census"
+              ],
+              "checkpoint": "vault-transfer"
+            }
+          ]
         }
       ]
     }

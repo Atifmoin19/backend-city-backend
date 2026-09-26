@@ -1,0 +1,263 @@
+{
+  "slug": "vault-transfer",
+  "game_type": "sql_query",
+  "title": "Vault Transfer",
+  "character": "librarian",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "Gold moves between vaults in two steps: take it out, put it in. When the second step fails, Glitch pockets the difference.",
+    "goal": "Make each transfer all-or-nothing with a transaction: `404` for unknown vaults, `409` when the vault rules say no, and nothing half done."
+  },
+  "objective": "Every transfer happens completely or not at all, and no gold ever goes missing.",
+  "rules": [
+    "Move `amount` gold from `from_vault` to `to_vault`; answer both new balances.",
+    "Either vault unknown: `404`, and no balance changes.",
+    "A transfer that breaks the vault rules (a balance below 0 or above 1000): `409`, and no balance changes.",
+    "Values go in `?` parameters, never pasted into the SQL."
+  ],
+  "variant_params": {
+    "third": [
+      "Deep",
+      "Crypt"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel, Field\nfrom harness.vault import IntegrityError, open_vault\n\n# The vault rules live in the table: gold stays between 0 and 1000 (a CHECK constraint).\n# A write that breaks it raises IntegrityError.\nSCHEMA = \"\"\"\nCREATE TABLE vaults (\n  name TEXT PRIMARY KEY,\n  gold INTEGER NOT NULL CHECK (gold BETWEEN 0 AND 1000)\n);\nINSERT INTO vaults VALUES ('North', 400), ('South', 900), ('{{third}}', 200);\n\"\"\"\ndb = open_vault(SCHEMA)\napp = FastAPI()\n\n\nclass Transfer(BaseModel):\n    from_vault: str\n    to_vault: str\n    amount: int = Field(gt=0)\n\n\ndef gold(name: str) -> int | None:\n    row = db.execute(\"SELECT gold FROM vaults WHERE name = ?\", (name,)).fetchone()\n    return None if row is None else row[0]\n\n\n@app.get(\"/vaults/{name}\")\nasync def vault(name: str) -> dict[str, object]:\n    amount = gold(name)\n    if amount is None:\n        raise HTTPException(status_code=404, detail=\"No such vault\")\n    return {\"name\": name, \"gold\": amount}\n\n\n@app.post(\"/transfer\")\nasync def transfer(body: Transfer) -> dict[str, object]:\n    # >>> EDIT START\n    db.execute(f\"UPDATE vaults SET gold = gold - {body.amount} WHERE name = '{body.from_vault}'\")\n    db.execute(f\"UPDATE vaults SET gold = gold + {body.amount} WHERE name = '{body.to_vault}'\")\n    # <<< EDIT END\n    return {\"from_balance\": gold(body.from_vault), \"to_balance\": gold(body.to_vault)}\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "North sends 100 to South",
+      "request": {
+        "method": "POST",
+        "path": "/transfer",
+        "json": {
+          "from_vault": "North",
+          "to_vault": "South",
+          "amount": 100
+        }
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "from_balance": 300,
+        "to_balance": 1000
+      }
+    },
+    {
+      "name": "South is full",
+      "request": {
+        "method": "POST",
+        "path": "/transfer",
+        "json": {
+          "from_vault": "{{third}}",
+          "to_vault": "South",
+          "amount": 10
+        }
+      },
+      "expect_status": 409
+    },
+    {
+      "name": "{{third}} kept its gold",
+      "request": {
+        "method": "GET",
+        "path": "/vaults/{{third}}"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "gold": 200
+      }
+    },
+    {
+      "name": "A vault that isn't there",
+      "request": {
+        "method": "POST",
+        "path": "/transfer",
+        "json": {
+          "from_vault": "North",
+          "to_vault": "Nowhere",
+          "amount": 50
+        }
+      },
+      "expect_status": 404
+    }
+  ],
+  "hidden_tests": {
+    "tests": [
+      {
+        "name": "North kept its gold",
+        "request": {
+          "method": "GET",
+          "path": "/vaults/North"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "gold": 300
+        }
+      },
+      {
+        "name": "{{third}} can't overdraw",
+        "request": {
+          "method": "POST",
+          "path": "/transfer",
+          "json": {
+            "from_vault": "{{third}}",
+            "to_vault": "North",
+            "amount": 201
+          }
+        },
+        "expect_status": 409
+      },
+      {
+        "name": "{{third}} still has 200",
+        "request": {
+          "method": "GET",
+          "path": "/vaults/{{third}}"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "gold": 200
+        }
+      },
+      {
+        "name": "{{third}} empties out",
+        "request": {
+          "method": "POST",
+          "path": "/transfer",
+          "json": {
+            "from_vault": "{{third}}",
+            "to_vault": "North",
+            "amount": 200
+          }
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "from_balance": 0,
+          "to_balance": 500
+        }
+      },
+      {
+        "name": "From a vault that isn't there",
+        "request": {
+          "method": "POST",
+          "path": "/transfer",
+          "json": {
+            "from_vault": "Nowhere",
+            "to_vault": "North",
+            "amount": 5
+          }
+        },
+        "expect_status": 404
+      },
+      {
+        "name": "North unchanged after that",
+        "request": {
+          "method": "GET",
+          "path": "/vaults/North"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "gold": 500
+        }
+      },
+      {
+        "name": "North would overflow",
+        "request": {
+          "method": "POST",
+          "path": "/transfer",
+          "json": {
+            "from_vault": "South",
+            "to_vault": "North",
+            "amount": 600
+          }
+        },
+        "expect_status": 409
+      },
+      {
+        "name": "South still full",
+        "request": {
+          "method": "GET",
+          "path": "/vaults/South"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "gold": 1000
+        }
+      },
+      {
+        "name": "A quote-mark trick",
+        "request": {
+          "method": "POST",
+          "path": "/transfer",
+          "json": {
+            "from_vault": "North' --",
+            "to_vault": "South",
+            "amount": 1
+          }
+        },
+        "expect_status": 404
+      },
+      {
+        "name": "North untouched by the trick",
+        "request": {
+          "method": "GET",
+          "path": "/vaults/North"
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "gold": 500
+        }
+      },
+      {
+        "name": "Nothing to move",
+        "request": {
+          "method": "POST",
+          "path": "/transfer",
+          "json": {
+            "from_vault": "North",
+            "to_vault": "South",
+            "amount": 0
+          }
+        },
+        "expect_status": 422
+      },
+      {
+        "name": "South to North, just fits",
+        "request": {
+          "method": "POST",
+          "path": "/transfer",
+          "json": {
+            "from_vault": "South",
+            "to_vault": "North",
+            "amount": 500
+          }
+        },
+        "expect_status": 200,
+        "expect_body": {
+          "from_balance": 500,
+          "to_balance": 1000
+        }
+      }
+    ]
+  },
+  "reference_solution": "try:\n    with db:  # one transaction: commit if every step works, roll back if any fails\n        for name, change in ((body.from_vault, -body.amount), (body.to_vault, body.amount)):\n            cur = db.execute(\"UPDATE vaults SET gold = gold + ? WHERE name = ?\", (change, name))\n            if cur.rowcount == 0:\n                raise HTTPException(status_code=404, detail=\"No such vault\")\nexcept IntegrityError:\n    raise HTTPException(status_code=409, detail=\"The vault rules say no\") from None\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "The two UPDATEs must succeed or fail together. `with db:` opens a transaction: it commits when the block ends and rolls back if anything inside raises."
+    },
+    {
+      "tier": 2,
+      "text": "cur.rowcount is how many rows an UPDATE changed: 0 means the vault doesn't exist. A broken CHECK raises IntegrityError; catch it outside the `with db:` block and answer 409."
+    },
+    {
+      "tier": 3,
+      "text": "try: with db: run each UPDATE with (change, name) parameters and raise HTTPException(status_code=404) when rowcount == 0. except IntegrityError: raise HTTPException(status_code=409)."
+    }
+  ],
+  "dialogue": {
+    "start": "Glitch keeps skimming gold between the two steps of a transfer. Seal the gap.",
+    "success": "All or nothing, every time. The ledgers balance to the last coin.",
+    "fail": "Some gold went missing, or a transfer happened that the vault rules forbid."
+  }
+}

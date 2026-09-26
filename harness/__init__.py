@@ -9,4 +9,4 @@ also run on the server inside the grading sandbox. Therefore:
     everything in this folder is public.
 """
 
-HARNESS_VERSION = "0.3.0"
+HARNESS_VERSION = "0.3.1"
