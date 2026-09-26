@@ -104,7 +104,7 @@ Every published topic in curriculum order. `track` limits it to one city (track 
 Body `{ "onboarded": bool, "lessons_done": [topic slug] }`: one-time move of browser-kept progress.
 Checkpoints are never imported (they only count when graded on the server).
 
-### `GET /me/quiz-results` → 200 `{ results: [{ quiz, best_score, total, best_combo, plays }] }`
+### `GET /me/quiz-results` → 200 `{ results: [{ quiz, best_score, total, best_combo, plays, last_played_at }] }`
 Best round per quiz (highest share correct, then combo).
 ### `POST /me/quiz-results` → 201 `{ results }` · 422 score/combo above total, bad slug
 Body `{ quiz: slug, score, total (1-100), best_combo?, seconds? }`. Quizzes (Speed Round, Pick the
@@ -114,7 +114,8 @@ Body `{ kind: "bug"|"idea"|"content"|"other", message (3-2000), page?, game_slug
 ### `GET /me/stats?tz=Asia/Kolkata` → 200 `{ xp, level: { level, xp_into, xp_needed }, streak: { current, best, active_today }, badges: [{ key, title, description, earned_at|null }] }`
 Derived from attempts, topic progress and quiz rounds (nothing stored; rules in
 `app/services/rewards.py`): briefing 20 XP, practice game 30, checkpoint 100 + 25/star, quiz
-2/right answer (first 3 rounds per quiz per day). Level 1 = 100 XP, each next +50. `tz` sets the
+2/right answer (first 3 rounds per quiz per day; the `daily` quiz counts its first round per
+day only, plus 20). Level 1 = 100 XP, each next +50. `tz` sets the
 day boundary for streaks (unknown → UTC).
 ### `PUT /me/placement` → 200 `UserPublic` · 404 `district_not_found`
 Body `{ start_district: district_key }`: where the placement quiz suggests starting. Only a

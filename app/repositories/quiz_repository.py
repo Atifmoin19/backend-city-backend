@@ -24,6 +24,9 @@ class QuizRepository:
                 QuizResult.total,
                 QuizResult.best_combo,
                 func.count().over(partition_by=QuizResult.quiz_slug).label("plays"),
+                func.max(QuizResult.created_at)
+                .over(partition_by=QuizResult.quiz_slug)
+                .label("last_played_at"),
                 func.row_number()
                 .over(
                     partition_by=QuizResult.quiz_slug,
@@ -47,6 +50,7 @@ class QuizRepository:
                 total=r.total,
                 best_combo=r.best_combo,
                 plays=r.plays,
+                last_played_at=r.last_played_at,
             )
             for r in rows
         ]

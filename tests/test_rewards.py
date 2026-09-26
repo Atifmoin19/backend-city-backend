@@ -115,3 +115,18 @@ async def test_stats_count_real_practice_and_checkpoints(
     assert body["xp"] == rewards.XP_PRACTICE + rewards.XP_CHECKPOINT + 3 * rewards.XP_PER_STAR
     earned = {b["key"] for b in body["badges"] if b["earned_at"]}
     assert {"first-200", "cleared", "no-hint-hero"} <= earned
+
+
+def test_daily_challenge_counts_once_a_day_with_a_bonus() -> None:
+    day = [rewards.QuizRec("daily", 4, 5, 2, T0 + timedelta(minutes=i)) for i in range(3)]
+    r = recs(quizzes=day)
+    assert rewards.xp_total(r) == rewards.XP_DAILY_BONUS + 4 * rewards.XP_PER_QUIZ_ANSWER
+
+
+def test_daily_regular_after_five_different_days() -> None:
+    days = [rewards.QuizRec("daily", 1, 5, 0, T0 + timedelta(days=d)) for d in (0, 0, 1, 2, 3)]
+    earned = {b.key: b.earned_at for b in rewards.badges(recs(quizzes=days), UTC_Z)}
+    assert earned["daily-5"] is None
+    five = [*days, rewards.QuizRec("daily", 1, 5, 0, T0 + timedelta(days=4))]
+    earned = {b.key: b.earned_at for b in rewards.badges(recs(quizzes=five), UTC_Z)}
+    assert earned["daily-5"] == T0 + timedelta(days=4)

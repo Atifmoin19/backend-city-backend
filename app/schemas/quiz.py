@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, model_validator
 
 SLUG = r"^[a-z0-9][a-z0-9-]{0,79}$"
@@ -23,6 +25,7 @@ class QuizBest(BaseModel):
     total: int  # of the best round
     best_combo: int
     plays: int
+    last_played_at: datetime  # e.g. has today's daily challenge been played
 
 
 class QuizResults(BaseModel):

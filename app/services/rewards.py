@@ -15,6 +15,8 @@ XP_CHECKPOINT = 100
 XP_PER_STAR = 25
 XP_PER_QUIZ_ANSWER = 2
 QUIZ_ROUNDS_PER_DAY = 3  # per quiz; later rounds still count for streaks, not XP
+DAILY_QUIZ = "daily"  # the daily challenge: one scored round per day, plus a bonus
+XP_DAILY_BONUS = 20
 
 
 @dataclass(frozen=True)
@@ -92,7 +94,10 @@ def xp_total(r: Records) -> int:
     for q in sorted(r.quizzes, key=lambda q: q.at):
         key = (q.quiz, q.at.date())
         rounds[key] += 1
-        if rounds[key] <= QUIZ_ROUNDS_PER_DAY:
+        if q.quiz == DAILY_QUIZ:
+            if rounds[key] == 1:
+                xp += XP_DAILY_BONUS + XP_PER_QUIZ_ANSWER * q.score
+        elif rounds[key] <= QUIZ_ROUNDS_PER_DAY:
             xp += XP_PER_QUIZ_ANSWER * q.score
     return xp
 
@@ -142,6 +147,15 @@ def _first(stamps: list[datetime]) -> datetime | None:
 
 def _nth(stamps: list[datetime], n: int) -> datetime | None:
     return sorted(stamps)[n - 1] if len(stamps) >= n else None
+
+
+def _daily_firsts(r: Records, tz: ZoneInfo) -> list[datetime]:
+    """The first daily-challenge round of each local day, oldest first."""
+    firsts: dict[date, datetime] = {}
+    for q in sorted(r.quizzes, key=lambda q: q.at):
+        if q.quiz == DAILY_QUIZ:
+            firsts.setdefault(q.at.astimezone(tz).date(), q.at)
+    return list(firsts.values())
 
 
 def badges(r: Records, tz: ZoneInfo) -> list[Badge]:
@@ -194,6 +208,12 @@ def badges(r: Records, tz: ZoneInfo) -> list[Badge]:
             _first(speed),
         ),
         Badge("sharp-eye", "Sharp eye", "A perfect Pick the Line round.", _first(sharp)),
+        Badge(
+            "daily-5",
+            "Daily regular",
+            "Finish the daily challenge on five different days.",
+            _nth(_daily_firsts(r, tz), 5),
+        ),
         Badge(
             "found-start",
             "Found your start",
