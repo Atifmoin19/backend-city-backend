@@ -1,0 +1,111 @@
+{
+  "slug": "front-desk",
+  "game_type": "python_basics",
+  "title": "Front Desk",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The Academy's front desk gets every visitor as JSON, but the clerk answers with blanks.",
+    "goal": "Read the visitor dict and answer with a greeting, how many roles they hold, and whether they're a {{vip_role}}."
+  },
+  "objective": "Every visitor gets the right greeting, role count and VIP flag.",
+  "rules": [
+    "`greeting` is `Welcome, <{{name_key}}>!`, e.g. `Welcome, Trinity!`.",
+    "`role_count` is how many items are in `roles`.",
+    "`vip` is `true` when `\"{{vip_role}}\"` is one of the roles."
+  ],
+  "variant_params": {
+    "name_key": [
+      "name",
+      "callsign"
+    ],
+    "vip_role": [
+      "admin",
+      "captain"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI\n\napp = FastAPI()\n\n\n@app.post(\"/visitors\")\nasync def check_in(visitor: dict) -> dict:\n    # A JSON body arrives as a dict: visitor[\"{{name_key}}\"], visitor[\"roles\"]\n    # >>> EDIT START\n    return {\"greeting\": \"\", \"role_count\": 0, \"vip\": False}\n    # <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Trinity ({{vip_role}}) arrives",
+      "request": {
+        "method": "POST",
+        "path": "/visitors",
+        "json": {
+          "{{name_key}}": "Trinity",
+          "roles": [
+            "pilot",
+            "{{vip_role}}"
+          ]
+        }
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "greeting": "Welcome, Trinity!",
+        "role_count": 2,
+        "vip": true
+      }
+    },
+    {
+      "name": "A visitor with one role",
+      "request": {
+        "method": "POST",
+        "path": "/visitors",
+        "json": {
+          "{{name_key}}": "Neo",
+          "roles": [
+            "operator"
+          ]
+        }
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "greeting": "Welcome, Neo!",
+        "role_count": 1,
+        "vip": false
+      }
+    },
+    {
+      "name": "A visitor with no roles yet",
+      "request": {
+        "method": "POST",
+        "path": "/visitors",
+        "json": {
+          "{{name_key}}": "Mouse",
+          "roles": []
+        }
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "greeting": "Welcome, Mouse!",
+        "role_count": 0,
+        "vip": false
+      }
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "roles = visitor[\"roles\"]\nreturn {\n    \"greeting\": f\"Welcome, {visitor['{{name_key}}']}!\",\n    \"role_count\": len(roles),\n    \"vip\": \"{{vip_role}}\" in roles,\n}\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Dict keys are read with square brackets and quotes, not dots: visitor[\"roles\"]."
+    },
+    {
+      "tier": 2,
+      "text": "f-strings are Python's template literals: f\"Welcome, {name}!\". len() counts a list; `x in some_list` checks membership."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: \"role_count\": len(visitor[\"roles\"]), \"vip\": \"{{vip_role}}\" in visitor[\"roles\"]"
+    }
+  ],
+  "dialogue": {
+    "start": "Visitors keep walking up and the clerk just stares. Can you teach it to read?",
+    "success": "Every visitor greeted by name. The desk is open!",
+    "fail": "Some visitors got the wrong answer. Check each field."
+  }
+}

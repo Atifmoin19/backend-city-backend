@@ -2,6 +2,15 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
+## 2026-09-26 — Session 4: Academy practice games
+
+### Done
+- Two Academy practice games (`game_type: python_basics`), graded on the JSON body:
+  **Front Desk** (dict access, f-strings, `len`, `in`) and **Score Board** (comprehension,
+  `sorted(key=...)`, `None` when empty). Placed on `python-for-js` as practice only: the topic
+  stays lesson-completed (no checkpoint) so learners who already cleared the Academy keep it.
+- API title is now "Full Stack City API". 168 tests pass.
+
 ## 2026-09-26 — Session 3: Full Stack City (tracks + interest)
 
 ### Done

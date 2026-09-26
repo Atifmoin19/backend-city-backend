@@ -1,0 +1,117 @@
+{
+  "slug": "score-board",
+  "game_type": "python_basics",
+  "title": "Score Board",
+  "character": "byte",
+  "visualizer": "request_flow",
+  "scenario": {
+    "intro": "The Academy posts exam results, but the board lists every cadet in signup order, passed or not.",
+    "goal": "Filter the cadets who reached `min_score`, rank them highest first, and name the best one."
+  },
+  "objective": "The board shows only the cadets who passed, best first.",
+  "rules": [
+    "`names`: cadets with a score of at least `min_score`, highest score first.",
+    "`best`: the top cadet's name, or `null` (Python `None`) when nobody passed."
+  ],
+  "variant_params": {
+    "top": [
+      "Trinity",
+      "Niobe"
+    ],
+    "low": [
+      "Mouse",
+      "Dozer"
+    ]
+  },
+  "starter_code": "from fastapi import FastAPI\n\napp = FastAPI()\n\nSCORES = [\n    {\"name\": \"{{top}}\", \"score\": 91},\n    {\"name\": \"{{low}}\", \"score\": 48},\n    {\"name\": \"Neo\", \"score\": 77},\n    {\"name\": \"Switch\", \"score\": 64},\n    {\"name\": \"Tank\", \"score\": 85},\n]\n\n\n@app.get(\"/passed\")\nasync def passed(min_score: int = 70) -> dict:\n    # >>> EDIT START\n    names = []\n    for cadet in SCORES:\n        names.append(cadet[\"name\"])\n    return {\"names\": names, \"best\": names[0]}\n    # <<< EDIT END\n",
+  "editable_region": {
+    "start_marker": "# >>> EDIT START",
+    "end_marker": "# <<< EDIT END"
+  },
+  "public_tests": [
+    {
+      "name": "Honours list (80+)",
+      "request": {
+        "method": "GET",
+        "path": "/passed",
+        "query": "min_score=80"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "names": [
+          "{{top}}",
+          "Tank"
+        ],
+        "best": "{{top}}"
+      }
+    },
+    {
+      "name": "Pass mark 60",
+      "request": {
+        "method": "GET",
+        "path": "/passed",
+        "query": "min_score=60"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "names": [
+          "{{top}}",
+          "Tank",
+          "Neo",
+          "Switch"
+        ],
+        "best": "{{top}}"
+      }
+    },
+    {
+      "name": "Exactly on the mark counts",
+      "request": {
+        "method": "GET",
+        "path": "/passed",
+        "query": "min_score=77"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "names": [
+          "{{top}}",
+          "Tank",
+          "Neo"
+        ]
+      }
+    },
+    {
+      "name": "Nobody reaches 95",
+      "request": {
+        "method": "GET",
+        "path": "/passed",
+        "query": "min_score=95"
+      },
+      "expect_status": 200,
+      "expect_body": {
+        "names": [],
+        "best": null
+      }
+    }
+  ],
+  "hidden_tests": {},
+  "reference_solution": "ranked = sorted(SCORES, key=lambda c: c[\"score\"], reverse=True)\nnames = [c[\"name\"] for c in ranked if c[\"score\"] >= min_score]\nreturn {\"names\": names, \"best\": names[0] if names else None}\n",
+  "hints": [
+    {
+      "tier": 1,
+      "text": "Two jobs: keep only the cadets who passed, then order them. Python's sorted() is like a copy-and-sort, and takes a key= function."
+    },
+    {
+      "tier": 2,
+      "text": "A list comprehension is filter + map in one line: [c[\"name\"] for c in cadets if c[\"score\"] >= min_score]. `x if cond else y` is the ternary."
+    },
+    {
+      "tier": 3,
+      "text": "Something like: sorted(SCORES, key=lambda c: c[\"score\"], reverse=True), then a comprehension, then names[0] if names else None."
+    }
+  ],
+  "dialogue": {
+    "start": "Everyone's name is on the board, even the ones who failed. Awkward.",
+    "success": "Only the cadets who passed, best at the top. Proper ceremony.",
+    "fail": "The board still has the wrong names or order."
+  }
+}

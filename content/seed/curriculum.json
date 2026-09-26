@@ -14,7 +14,11 @@
           "topics": [
             {
               "slug": "python-for-js",
-              "title": "Python for JavaScript developers"
+              "title": "Python for JavaScript developers",
+              "practice": [
+                "front-desk",
+                "score-board"
+              ]
             }
           ]
         }
