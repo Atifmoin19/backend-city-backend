@@ -199,6 +199,29 @@ when graded on the server, so those learners retake one checkpoint.
 
 ---
 
+## Account emails: EmailJS setup (once)
+
+Until this is done, sign-up still works; verification and reset emails just aren't sent (the
+API logs "EmailJS not configured"). Free plan: 200 emails/month, 2 templates.
+
+1. Sign up at **emailjs.com** → **Email Services** → add one (e.g. Gmail) → note the
+   **Service ID**.
+2. **Email Templates** → create two. In both, set **To email** to `{{to_email}}` and use
+   `{{to_name}}` and `{{link}}` in the body:
+   - *Verify*: subject "Verify your email for Full Stack City", body with a button to `{{link}}`.
+   - *Reset*: subject "Reset your Full Stack City password", body with `{{link}}` and a line
+     that it expires in an hour.
+   Note both **Template IDs**.
+3. **Account → General**: copy the **Public Key** and **Private Key**. **Account → Security**:
+   turn on **"Allow EmailJS API for non-browser applications"** (the API sends from Render).
+4. On **Render** → Environment, add:
+   `EMAILJS_SERVICE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY`,
+   `EMAILJS_TEMPLATE_VERIFY`, `EMAILJS_TEMPLATE_RESET`, and
+   `APP_URL=https://backend-city-frontend-two.vercel.app` (where links point).
+5. Test: `/forgot-password` with your own email → the link arrives → set a new password.
+
+---
+
 ## Troubleshooting
 
 | Symptom                                                       | Cause → fix                                                                                                           |

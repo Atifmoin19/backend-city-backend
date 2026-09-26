@@ -55,3 +55,21 @@ class UserPublic(BaseModel):
 
 class AuthResponse(BaseModel):
     user: UserPublic
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class EmailTokenRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=200)

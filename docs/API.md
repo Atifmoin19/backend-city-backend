@@ -34,7 +34,17 @@ Revokes the current refresh token, clears cookies.
 
 ### `GET /auth/me` → 200 `UserPublic` · 401 `not_authenticated`
 
-`UserPublic = { id: uuid, email, display_name, role: "user"|"content_editor"|"super_admin", is_verified, onboarded }`
+`UserPublic = { id: uuid, email, display_name, role: "user"|"content_editor"|"super_admin", is_verified, onboarded, learning_goal, start_district }`
+
+### Account emails (EmailJS; links point at `APP_URL`)
+Tokens are random, stored as SHA-256, single use; a new link retires older ones of that kind.
+Registering sends a verification link in the background.
+- `POST /auth/verify-email {token}` → 200 `UserPublic` · 400 `invalid_token` (used, expired, wrong kind)
+- `POST /auth/verify-email/resend` → 204 (login required; nothing sent if already verified) · 429
+- `POST /auth/forgot-password {email}` → **always 204** (no account enumeration) · 429 (`EMAIL_RATE_LIMIT`, 5/hour per IP)
+- `POST /auth/reset-password {token, password (8-128)}` → 204, revokes every refresh token and
+  marks the email verified · 400 `invalid_token` · 422
+Links: verify 24 h (`VERIFY_TOKEN_TTL_HOURS`), reset 60 min (`RESET_TOKEN_TTL_MINUTES`).
 
 ## Games
 ### `GET /games/{slug}/variant?mode=practice|checkpoint&seed=<1..2^31-1>` → 200 `GameVariantPublic`

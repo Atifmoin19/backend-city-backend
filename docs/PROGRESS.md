@@ -2,6 +2,15 @@
 
 Running log. Newest entry on top. Update at the end of every task.
 
+## 2026-09-26 — Session 5: growth + account emails
+
+### Done
+- Daily challenge rewards (`daily` quiz: first round per day + 20 XP; badge *Daily regular*);
+  quiz bests carry `last_played_at`.
+- Account emails: `/auth/verify-email`, `/verify-email/resend`, `/forgot-password`,
+  `/reset-password` on the existing `email_tokens` table (no migration). EmailJS REST from the
+  server via httpx; unconfigured = link logged (never in production). 191 tests pass.
+
 ## 2026-09-26 — Session 4: Academy games, quizzes, rewards, analytics, parallel sandbox
 
 ### Done
@@ -28,7 +37,7 @@ Running log. Newest entry on top. Update at the end of every task.
 - Released to production (Render + Neon, head `37d08d8cd287`).
 
 ### Next up (owner decides)
-1. Email flows: verify email, forgot/reset password (EmailJS).
+1. ~~Email flows~~ done in v1.12.0 (EmailJS keys still to be set on Render).
 2. Admin: create games/topics from the panel, audit log; serve the topic → game list to the
    frontend.
 3. Data Vaults (Level 3): allow `sqlite3` in the policy + audit hook limited to `:memory:`,

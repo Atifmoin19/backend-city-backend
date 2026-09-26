@@ -66,10 +66,23 @@ class Settings(BaseSettings):
     auth_rate_limit: str = "10/minute"
     checkpoint_rate_limit: str = "20/minute"
     feedback_rate_limit: str = "10/hour"
+    email_rate_limit: str = "5/hour"  # forgot-password + resend-verification, per IP
     # Shared with the frontend proxy (PROXY_SHARED_SECRET on Vercel). When a request carries
     # it, its X-BC-Client-IP header is the learner's real IP; every request otherwise looks
     # like it came from Vercel, so all learners would share one rate-limit bucket.
     proxy_shared_secret: SecretStr | None = None
+
+    # Account emails (EmailJS REST API, sent from the server). Unset = links are only logged,
+    # which is what local dev and tests use. EmailJS needs "Allow EmailJS API for non-browser
+    # applications" turned on (Account → Security).
+    app_url: str = "http://localhost:3000"  # links in emails point here
+    emailjs_service_id: str | None = None
+    emailjs_public_key: str | None = None
+    emailjs_private_key: SecretStr | None = None
+    emailjs_template_verify: str | None = None
+    emailjs_template_reset: str | None = None
+    verify_token_ttl_hours: int = 24
+    reset_token_ttl_minutes: int = 60
 
     # CORS — only needed for direct calls; production uses same-origin rewrites
     cors_origins: list[str] = ["http://localhost:3000"]
